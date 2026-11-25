@@ -18,7 +18,7 @@ Coarse items (later phases) are split into small steps before work on them start
 - [x] Linker scripts: `virt` (load at 0x40080000) and `rpi4` (load at 0x80000)
 - [x] `arch/aarch64/boot.S`: park secondary cores, set up the stack, zero BSS, call `kernel_main`
 - [x] HAL interface `include/hal.h`: `hal_init`, `hal_console_putc`, `hal_console_getc`
-- [ ] PL011 UART driver; `board/virt` (UART at 0x09000000) and `board/rpi4` (UART at 0xFE201000)
+- [x] PL011 UART driver; `board/virt` (UART at 0x09000000) and `board/rpi4` (UART at 0xFE201000)
 - [ ] `lib/`: `memset`, `memcpy`, `strlen`, `kprintf` (%s %c %d %u %x %p)
 - [ ] `kernel_main` prints the OS-001 banner; boots in QEMU on both boards
 - [ ] `tests/boot_test.sh` + `make test`: boots each board in QEMU headless and checks the banner appears
