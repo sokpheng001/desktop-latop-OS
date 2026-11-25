@@ -17,3 +17,11 @@ unsigned int arch_current_el(void)
 	__asm__ volatile("mrs %0, CurrentEL" : "=r"(el));
 	return (unsigned int)((el >> CURRENTEL_EL_SHIFT) & CURRENTEL_EL_MASK);
 }
+
+void arch_halt(void)
+{
+	/* Mask all interrupts so nothing wakes this core into code that expects a live system. */
+	__asm__ volatile("msr daifset, #0xf" ::: "memory");
+	for (;;)
+		__asm__ volatile("wfe");
+}

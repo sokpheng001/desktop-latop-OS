@@ -12,6 +12,7 @@ BOARD         ?= virt
 CROSS_COMPILE ?= aarch64-elf-
 V             ?= 0
 CFLAGS_EXTRA  ?=
+KERNEL_TEST   ?=
 QEMU          ?= qemu-system-aarch64
 CLANG_FORMAT  ?= clang-format
 
@@ -59,6 +60,12 @@ LDLIBS   := -lgcc
 # Sources and outputs
 # ---------------------------------------------------------------------------
 BUILD_DIR := build/$(BOARD)
+
+# Self-test kernels (kernel/selftest.c) build into their own directory.
+ifneq ($(KERNEL_TEST),)
+BUILD_DIR := build/$(BOARD)-test-$(KERNEL_TEST)
+CFLAGS    += -DKERNEL_TEST_$(shell echo '$(KERNEL_TEST)' | tr 'a-z-' 'A-Z_')
+endif
 LDSCRIPT  := board/$(BOARD)/linker.ld
 LDSCRIPTS := $(LDSCRIPT) arch/$(ARCH)/kernel.ld
 
@@ -171,5 +178,6 @@ help:
 	@echo "  CROSS_COMPILE=<prefix>   Toolchain prefix (default: aarch64-elf-)"
 	@echo "  V=1                      Show full commands"
 	@echo "  CFLAGS_EXTRA=<flags>     Extra compiler flags"
+	@echo "  KERNEL_TEST=<name>       Build a self-test kernel (e.g. fault) into build/<board>-test-<name>/"
 
 -include $(DEPS)

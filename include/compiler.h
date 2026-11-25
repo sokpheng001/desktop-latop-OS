@@ -33,6 +33,9 @@
 
 #define UNREACHABLE() __builtin_unreachable()
 
+/* Deliberately raise an exception (a BRK instruction on AArch64). */
+#define TRAP() __builtin_trap()
+
 #define STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
 
 /* Number of elements in a true array (not a pointer). */

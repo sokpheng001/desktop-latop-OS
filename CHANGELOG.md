@@ -17,6 +17,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Boot drops from EL2 to EL1 when the loader enters at EL2 (Pi 4 firmware, QEMU `raspi4b`, `virt` with virtualization): EL1 runs AArch64 with no traps to EL2, timer and counter usable from EL1, interrupts masked
 - AArch64 system register constants (`include/arch/aarch64/sysregs.h`) and architecture interface `include/arch.h` (`arch_current_el`); the boot banner shows the exception level
 - Boot test checks the kernel runs at EL1 and adds a `virt-el2` run that enters at EL2
+- EL1 exception vector table (`arch/aarch64/vectors.S`): every exception saves a full register frame and calls a C handler; unexpected exceptions print their type, ESR (with decoded exception class), ELR, FAR, SPSR and x0-x30, then halt the core
+- `arch_exception_init`, `arch_halt` in the architecture interface; `TRAP()` in `compiler.h`
+- Kernel self-tests built with `make KERNEL_TEST=<name>` into `build/<board>-test-<name>/`; first one, `fault`, raises a breakpoint after boot
+- Boot test runs `virt-fault` and `rpi4-fault` and checks the exception report
 
 ### Changed
 - Version string set to `0.2.0-dev` for Phase 2 work

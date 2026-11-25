@@ -12,6 +12,14 @@
 
 #ifndef __ASSEMBLY__
 
+#include "compiler.h"
+
+/* Install the exception vectors. Call first in kernel_main. */
+void arch_exception_init(void);
+
+/* Stop this core for good, with interrupts masked. */
+void arch_halt(void) ATTR_NORETURN;
+
 /* Exception (privilege) level the kernel runs at: 1 for a normal kernel on AArch64. */
 unsigned int arch_current_el(void);
 

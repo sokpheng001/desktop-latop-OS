@@ -11,6 +11,7 @@
 #include "hal.h"
 #include "kernel.h"
 #include "lib/kprintf.h"
+#include "selftest.h"
 #include "version.h"
 
 /* Image bounds from the linker script (arch/aarch64/kernel.ld). */
@@ -19,6 +20,8 @@ extern char kernel_end[];
 
 void kernel_main(uptr dtb)
 {
+	/* First, so any fault from here on is reported instead of hanging silently. */
+	arch_exception_init();
 	hal_init();
 	console_init();
 
@@ -31,4 +34,6 @@ void kernel_main(uptr dtb)
 	else
 		kprintf("DTB:    not passed by the loader\n");
 	kprintf("Hello from OS-001!\n");
+
+	selftest_run();
 }
