@@ -26,6 +26,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Base headers: `include/types.h` (fixed-width types with size checks), `include/compiler.h` (attribute and helper macros), `include/mmio.h` (8/16/32/64-bit MMIO accessors and barriers)
 - Linker scripts: shared AArch64 layout `arch/aarch64/kernel.ld` (page-aligned sections, separate R-X / R / RW segments, 16 KB boot stack, `bss_start`/`bss_end` symbols) included by `board/virt/linker.ld` (0x40080000) and `board/rpi4/linker.ld` (0x80000); linker warnings are fatal
 - `arch/aarch64/boot.S`: parks secondary cores, sets the boot stack, clears `.bss`, passes the Device Tree address to `kernel_main`
+- HAL interface `include/hal.h`: `hal_init`, `hal_console_putc`, `hal_console_getc`
 - `include/kernel.h` and a minimal `kernel/main.c` (`kernel_main` entry point)
 - Vision: OS-001 is both a complete normal OS and a human-AI system ([docs/VISION.md](docs/VISION.md))
 
