@@ -25,7 +25,7 @@ Coarse items (later phases) are split into small steps before work on them start
 - [x] GitHub Actions CI (`.github/workflows/ci.yml`): on Ubuntu with `aarch64-linux-gnu-gcc` + `qemu-system-aarch64`, run `make check-format`, build both boards, `make test`
 
 ## Phase 2 — Exceptions and time (v0.2.0)
-- [ ] Drop from EL2 to EL1 at boot
+- [x] Drop from EL2 to EL1 at boot
 - [ ] Exception vector table; print ESR/ELR/FAR on any unexpected exception
 - [ ] Interrupt controller: GIC on `virt`, GIC-400 on `rpi4`, behind the HAL
 - [ ] ARM generic timer interrupt (100 Hz tick) and uptime counter

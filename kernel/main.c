@@ -6,6 +6,7 @@
  * kernel_main: architecture-independent kernel entry after early boot.
  */
 
+#include "arch.h"
 #include "console.h"
 #include "hal.h"
 #include "kernel.h"
@@ -23,6 +24,7 @@ void kernel_main(uptr dtb)
 
 	kprintf("\n%s %s\n", OS001_NAME, OS001_VERSION);
 	kprintf("Board:  %s\n", hal_board_name());
+	kprintf("EL:     %u\n", arch_current_el());
 	kprintf("Kernel: %p - %p\n", (void *)kernel_start, (void *)kernel_end);
 	if (dtb)
 		kprintf("DTB:    %p\n", (void *)dtb);

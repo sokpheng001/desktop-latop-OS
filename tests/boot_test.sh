@@ -4,14 +4,18 @@
 # Authors: kwan, oda, sokpheng001
 #
 # Boot test: builds every board, boots it headless in QEMU and checks the serial
-# console for the boot banner. QEMU never exits on its own, so each run is
-# stopped as soon as the banner appears, or after BOOT_TIMEOUT seconds.
+# console for the boot banner and the exception level. QEMU never exits on its
+# own, so each run is stopped as soon as the banner appears, or after
+# BOOT_TIMEOUT seconds.
+#
+# A run is "<board>" or "<board>-<variant>"; virt-el2 boots virt with the
+# virtualization extensions, so the kernel is entered at EL2 like on a Pi.
 
 set -u
 
 QEMU=${QEMU:-qemu-system-aarch64}
 BOOT_TIMEOUT=${BOOT_TIMEOUT:-10}
-BOARDS=${BOARDS:-"virt rpi4"}
+RUNS=${RUNS:-"virt virt-el2 rpi4"}
 EXPECT="Hello from OS-001!"
 LOG_DIR=build/test
 MAKE=${MAKE:-make}
@@ -22,6 +26,7 @@ status=0
 qemu_args() {
     case "$1" in
     virt) echo "-M virt -cpu cortex-a72 -m 1G -nic none -kernel build/virt/os001.elf" ;;
+    virt-el2) echo "-M virt,virtualization=on -cpu cortex-a72 -m 1G -nic none -kernel build/virt/os001.elf" ;;
     rpi4) echo "-M raspi4b -kernel build/rpi4/kernel8.img" ;;
     *) return 1 ;;
     esac
@@ -34,19 +39,20 @@ board_name() {
     esac
 }
 
-for board in $BOARDS; do
-    log="$LOG_DIR/boot-$board.log"
+for run in $RUNS; do
+    board=${run%%-*}
+    log="$LOG_DIR/boot-$run.log"
     : > "$log"
 
     if ! $MAKE -s BOARD="$board" > "$LOG_DIR/build-$board.log" 2>&1; then
-        echo "  FAIL    boot $board: build failed (see $LOG_DIR/build-$board.log)"
+        echo "  FAIL    boot $run: build failed (see $LOG_DIR/build-$board.log)"
         status=1
         continue
     fi
 
     # shellcheck disable=SC2046 # word splitting of the QEMU arguments is intended
-    $QEMU $(qemu_args "$board") -display none -monitor none -serial "file:$log" \
-        2> "$LOG_DIR/qemu-$board.err" &
+    $QEMU $(qemu_args "$run") -display none -monitor none -serial "file:$log" \
+        2> "$LOG_DIR/qemu-$run.err" &
     pid=$!
 
     waited=0
@@ -57,10 +63,12 @@ for board in $BOARDS; do
     kill "$pid" 2>/dev/null
     wait "$pid" 2>/dev/null
 
-    if grep -qF "$EXPECT" "$log" && grep -qF "Board:  $(board_name "$board")" "$log"; then
-        echo "  PASS    boot $board"
+    # The kernel must always end up at EL1, whatever level the loader entered at.
+    if grep -qF "$EXPECT" "$log" && grep -qF "Board:  $(board_name "$board")" "$log" &&
+        grep -qF "EL:     1" "$log"; then
+        echo "  PASS    boot $run"
     else
-        echo "  FAIL    boot $board: banner not seen within ${BOOT_TIMEOUT}s. Console output:"
+        echo "  FAIL    boot $run: banner, board or EL1 not seen within ${BOOT_TIMEOUT}s. Console output:"
         sed 's/^/          | /' "$log"
         status=1
     fi

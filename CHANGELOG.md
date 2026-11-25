@@ -13,6 +13,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- Boot drops from EL2 to EL1 when the loader enters at EL2 (Pi 4 firmware, QEMU `raspi4b`, `virt` with virtualization): EL1 runs AArch64 with no traps to EL2, timer and counter usable from EL1, interrupts masked
+- AArch64 system register constants (`include/arch/aarch64/sysregs.h`) and architecture interface `include/arch.h` (`arch_current_el`); the boot banner shows the exception level
+- Boot test checks the kernel runs at EL1 and adds a `virt-el2` run that enters at EL2
+
 ### Changed
 - Version string set to `0.2.0-dev` for Phase 2 work
 
