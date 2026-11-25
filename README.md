@@ -10,6 +10,7 @@ Our own kernel, written from scratch. Raspberry Pi first, then x86_64 PCs, and V
 
 - [Vision](docs/VISION.md): purpose and architecture
 - [Hardware](docs/HARDWARE.md): target platforms and requirements
+- [Changelog](CHANGELOG.md): history of changes
 
 ## Authors
 
