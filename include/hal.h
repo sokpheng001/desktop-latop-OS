@@ -23,6 +23,19 @@ void hal_console_putc(char c);
 /* Read one byte from the console without waiting. Returns -1 if none is available. */
 int hal_console_getc(void);
 
+/* Interrupt controller. Interrupt numbers are the controller's IDs (GIC: SGI 0-15, PPI 16-31, SPI
+ * 32+). */
+void hal_irq_enable(u32 irq);
+void hal_irq_disable(u32 irq);
+/*
+ * Claim the highest-priority pending interrupt. Returns its number and stores a token
+ * for hal_irq_complete, or returns -1 if nothing is pending.
+ */
+int hal_irq_claim(u32 *token);
+void hal_irq_complete(u32 token);
+/* Raise software interrupt sgi on this core (used by self-tests and, later, SMP). */
+void hal_irq_raise_soft(u32 sgi);
+
 /* Short, stable board identifier, e.g. "qemu-virt" (shown at boot and in logs). */
 const char *hal_board_name(void);
 

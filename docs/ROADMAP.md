@@ -27,7 +27,7 @@ Coarse items (later phases) are split into small steps before work on them start
 ## Phase 2 — Exceptions and time (v0.2.0)
 - [x] Drop from EL2 to EL1 at boot
 - [x] Exception vector table; print ESR/ELR/FAR on any unexpected exception
-- [ ] Interrupt controller: GIC on `virt`, GIC-400 on `rpi4`, behind the HAL
+- [x] Interrupt controller: GIC on `virt`, GIC-400 on `rpi4`, behind the HAL
 - [ ] ARM generic timer interrupt (100 Hz tick) and uptime counter
 - [ ] Tests for each of the above in `tests/`
 

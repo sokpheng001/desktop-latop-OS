@@ -4,4 +4,4 @@
 #
 # Drivers built into the rpi4 board image.
 
-DRIVERS := pl011
+DRIVERS := pl011 gicv2

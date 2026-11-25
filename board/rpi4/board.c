@@ -8,6 +8,7 @@
  */
 
 #include "board.h"
+#include "drivers/gicv2.h"
 #include "drivers/pl011.h"
 #include "hal.h"
 #include "mmio.h"
@@ -32,6 +33,11 @@
 #define GPIO_PULL_BITS 2
 #define GPIO_PULL_MASK 0x3u
 #define GPIO_PULL_NONE 0x0u
+
+static const struct gicv2 gic = {
+    .dist_base = BOARD_GICD_BASE,
+    .cpu_base = BOARD_GICC_BASE,
+};
 
 static const struct pl011 console = {
     .base = BOARD_UART_BASE,
@@ -63,6 +69,7 @@ void hal_init(void)
 {
 	board_uart_pins();
 	pl011_init(&console, CONSOLE_BAUD);
+	gicv2_init(&gic);
 }
 
 void hal_console_putc(char c)
@@ -78,4 +85,35 @@ int hal_console_getc(void)
 const char *hal_board_name(void)
 {
 	return BOARD_NAME;
+}
+
+void hal_irq_enable(u32 irq)
+{
+	gicv2_enable(&gic, irq);
+}
+
+void hal_irq_disable(u32 irq)
+{
+	gicv2_disable(&gic, irq);
+}
+
+int hal_irq_claim(u32 *token)
+{
+	u32 iar = gicv2_ack(&gic);
+	u32 irq = gicv2_iar_irq(iar);
+
+	if (irq == GICV2_SPURIOUS_ID)
+		return -1;
+	*token = iar;
+	return (int)irq;
+}
+
+void hal_irq_complete(u32 token)
+{
+	gicv2_eoi(&gic, token);
+}
+
+void hal_irq_raise_soft(u32 sgi)
+{
+	gicv2_send_sgi_self(&gic, sgi);
 }

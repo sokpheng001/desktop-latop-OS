@@ -35,5 +35,8 @@ void kernel_main(uptr dtb)
 		kprintf("DTB:    not passed by the loader\n");
 	kprintf("Hello from OS-001!\n");
 
+	/* Each source is still disabled at the controller until a driver registers it. */
+	arch_irq_enable();
+
 	selftest_run();
 }

@@ -4,4 +4,4 @@
 #
 # Drivers built into the virt board image.
 
-DRIVERS := pl011
+DRIVERS := pl011 gicv2

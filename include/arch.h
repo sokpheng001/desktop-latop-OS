@@ -17,6 +17,13 @@
 /* Install the exception vectors. Call first in kernel_main. */
 void arch_exception_init(void);
 
+/* Unmask / mask IRQs on this core. */
+void arch_irq_enable(void);
+void arch_irq_disable(void);
+
+/* Sleep until an interrupt is pending (it may be masked). */
+void arch_wait_for_interrupt(void);
+
 /* Stop this core for good, with interrupts masked. */
 void arch_halt(void) ATTR_NORETURN;
 

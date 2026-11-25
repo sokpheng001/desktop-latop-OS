@@ -23,4 +23,9 @@
 /* UART reference clock the Pi 4 firmware sets by default (48 MHz). */
 #define BOARD_UART_CLOCK_HZ 48000000u
 
+/* GIC-400 (BCM2711 ARM Peripherals, chapter 6): distributor and CPU interface. */
+#define BOARD_GIC_BASE	0xff840000ul
+#define BOARD_GICD_BASE (BOARD_GIC_BASE + 0x1000ul)
+#define BOARD_GICC_BASE (BOARD_GIC_BASE + 0x2000ul)
+
 #endif /* OS001_BOARD_H */

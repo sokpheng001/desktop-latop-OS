@@ -9,6 +9,7 @@
 
 #include "arch.h"
 #include "arch/aarch64/exception.h"
+#include "irq.h"
 #include "lib/kprintf.h"
 
 /* ESR_ELx fields (Arm ARM DDI 0487, ESR_EL1): exception class [31:26], ISS [24:0]. */
@@ -68,7 +69,13 @@ void arch_exception_handler(struct exc_frame *frame, u64 kind)
 {
 	u32 ec = (u32)(frame->esr >> ESR_EC_SHIFT) & ESR_EC_MASK;
 
-	/* Nothing is expected yet: interrupts arrive with the GIC and timer steps. */
+	/* The kernel runs at EL1 on SP_EL1, so its interrupts arrive in the current-EL SPx slot. */
+	if (kind == EXC_GROUP_CUR_SPX * EXC_TYPES_PER_GROUP + EXC_TYPE_IRQ) {
+		irq_dispatch();
+		return;
+	}
+
+	/* Anything else is a bug: report it and stop. */
 	kprintf("\n*** Unexpected exception: %s (%s)\n", type_names[kind % EXC_TYPES_PER_GROUP],
 		group_names[kind / EXC_TYPES_PER_GROUP]);
 	kprintf("ESR_EL1:  %p  EC=0x%02x %s  ISS=0x%07x\n", (void *)frame->esr, ec, ec_to_name(ec),

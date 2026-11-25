@@ -11,12 +11,14 @@
 #   el2    boot virt with virtualization on, so the kernel is entered at EL2
 #   fault  self-test kernel (make KERNEL_TEST=fault): a deliberate exception must
 #          be reported by the exception handler
+#   irq    self-test kernel (make KERNEL_TEST=irq): a software interrupt must go
+#          through the interrupt controller, the IRQ vector and dispatch, and return
 
 set -u
 
 QEMU=${QEMU:-qemu-system-aarch64}
 BOOT_TIMEOUT=${BOOT_TIMEOUT:-10}
-RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault"}
+RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-irq rpi4-irq"}
 LOG_DIR=build/test
 MAKE=${MAKE:-make}
 
@@ -54,6 +56,11 @@ for run in $RUNS; do
             "*** Unexpected exception: Synchronous (current EL, SP_ELx)" \
             "EC=0x3c Breakpoint (BRK)" \
             "*** System halted.")
+        ;;
+    irq)
+        make_args="$make_args KERNEL_TEST=irq"
+        build_dir="build/$board-test-irq"
+        expect=$(printf '%s\n' "$expect" "Self-test: IRQ 1 received and returned")
         ;;
     *)
         echo "  FAIL    boot $run: unknown variant '$variant'"

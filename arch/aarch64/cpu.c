@@ -25,3 +25,18 @@ void arch_halt(void)
 	for (;;)
 		__asm__ volatile("wfe");
 }
+
+void arch_irq_enable(void)
+{
+	__asm__ volatile("msr daifclr, #2" ::: "memory"); /* clear PSTATE.I */
+}
+
+void arch_irq_disable(void)
+{
+	__asm__ volatile("msr daifset, #2" ::: "memory");
+}
+
+void arch_wait_for_interrupt(void)
+{
+	__asm__ volatile("wfi" ::: "memory");
+}

@@ -21,6 +21,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `arch_exception_init`, `arch_halt` in the architecture interface; `TRAP()` in `compiler.h`
 - Kernel self-tests built with `make KERNEL_TEST=<name>` into `build/<board>-test-<name>/`; first one, `fault`, raises a breakpoint after boot
 - Boot test runs `virt-fault` and `rpi4-fault` and checks the exception report
+- GICv2 interrupt controller driver (`drivers/gicv2/`, from Arm IHI 0048B): distributor and CPU interface reset, enable/disable, acknowledge/end-of-interrupt, SGIs; used for QEMU `virt` (GICv2 at 0x08000000) and the Pi 4 GIC-400 (0xFF840000)
+- HAL interrupt API (`hal_irq_enable`, `hal_irq_disable`, `hal_irq_claim`, `hal_irq_complete`, `hal_irq_raise_soft`) and kernel IRQ dispatch with a per-interrupt handler table (`kernel/irq.c`, `irq_register`)
+- IRQ exceptions are dispatched and return to the interrupted code; `arch_irq_enable`, `arch_irq_disable`, `arch_wait_for_interrupt`; IRQs are unmasked after boot
+- Self-test `KERNEL_TEST=irq` and boot-test runs `virt-irq`, `rpi4-irq`: a software interrupt must arrive through the GIC and return
 
 ### Changed
 - Version string set to `0.2.0-dev` for Phase 2 work
