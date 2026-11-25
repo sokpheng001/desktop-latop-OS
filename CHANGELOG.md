@@ -32,6 +32,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Host unit tests for `lib/` (`tests/lib_test.sh`), run by `make test`
 - Boot banner: `kernel_main` prints the OS-001 version, board, kernel image range, Device Tree address and "Hello from OS-001!"; kernel console (`kernel/console.c`) and `hal_board_name`
 - Boot test `tests/boot_test.sh`: builds each board, boots it headless in QEMU and checks the banner; `make test` runs it
+- GitHub Actions CI (`.github/workflows/ci.yml`): in Debian trixie (QEMU 10), format check, build both boards with `aarch64-linux-gnu-`, `make test`; boot logs uploaded
 - `include/kernel.h` and a minimal `kernel/main.c` (`kernel_main` entry point)
 - Vision: OS-001 is both a complete normal OS and a human-AI system ([docs/VISION.md](docs/VISION.md))
 

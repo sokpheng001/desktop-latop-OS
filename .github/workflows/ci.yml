@@ -1,0 +1,59 @@
+# Project: OS-001
+# Date: 2026-11-25
+# Authors: kwan, oda, sokpheng001
+#
+# Continuous integration: format check, build every board, run make test
+# (host unit tests and QEMU boot tests) on every push to dev and main.
+
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    # Debian trixie ships QEMU 10, which has the raspi4b machine (needs QEMU >= 9.0).
+    container: debian:trixie
+    env:
+      CROSS_COMPILE: aarch64-linux-gnu-
+      # Same clang-format major version as the developers use, so formatting matches.
+      CLANG_FORMAT: /opt/fmt/bin/clang-format
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            make gcc libc6-dev gcc-aarch64-linux-gnu qemu-system-arm \
+            python3 python3-venv ca-certificates
+          python3 -m venv /opt/fmt
+          /opt/fmt/bin/pip install --quiet clang-format==23.1.5
+          aarch64-linux-gnu-gcc --version | head -1
+          qemu-system-aarch64 --version | head -1
+          "$CLANG_FORMAT" --version
+
+      - name: Check formatting
+        run: make check-format
+
+      - name: Build virt
+        run: make BOARD=virt
+
+      - name: Build rpi4
+        run: make BOARD=rpi4
+
+      - name: Test
+        run: make test
+
+      - name: Upload boot logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-logs
+          path: build/test/
+          if-no-files-found: ignore
