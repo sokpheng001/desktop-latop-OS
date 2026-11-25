@@ -54,7 +54,7 @@ SECTIONS
 		*(COMMON)
 		. = ALIGN(16);
 		bss_end = .;
-	}
+	} :data
 
 	/* The AArch64 stack pointer must stay 16-byte aligned. */
 	. = ALIGN(PAGE_SIZE);
@@ -62,7 +62,7 @@ SECTIONS
 		boot_stack_bottom = .;
 		. += BOOT_STACK_SIZE;
 		boot_stack_top = .;
-	}
+	} :data
 
 	kernel_end = .;
 

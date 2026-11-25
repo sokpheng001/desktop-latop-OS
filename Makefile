@@ -83,7 +83,7 @@ FMT_FILES := $(shell find arch board kernel drivers lib include tests \
 # QEMU
 # ---------------------------------------------------------------------------
 ifeq ($(BOARD),virt)
-QEMU_ARGS := -M virt -cpu cortex-a72 -m 1G -nographic -kernel $(ELF)
+QEMU_ARGS := -M virt -cpu cortex-a72 -m 1G -nic none -nographic -kernel $(ELF)
 else
 QEMU_ARGS := -M raspi4b -serial stdio -display none -kernel $(IMG)
 endif

@@ -96,7 +96,9 @@ static void test_kprintf(void)
 	check_fmt("plain text", "plain text");
 	check_fmt("100%", "100%%");
 	check_fmt("a OS-001 z", "a %s z", "OS-001");
-	check_fmt("(null)", "%s", (const char *)NULL);
+	/* volatile hides the constant NULL from GCC's format checker; kprintf must handle it. */
+	const char *volatile null_str = NULL;
+	check_fmt("(null)", "%s", null_str);
 	check_fmt("[x]", "[%c]", 'x');
 	check_fmt("0 42 -42", "%d %d %d", 0, 42, -42);
 	check_fmt("-2147483648", "%d", (int)(-2147483647 - 1));

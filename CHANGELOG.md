@@ -39,6 +39,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Working hours for daily progress reports: Monday to Friday, 5 PM to 11:59 PM
 - File header now records the date each file was first written (`Date: YYYY-MM-DD` above `Authors`)
 
+### Fixed
+- Linux cross toolchain (`aarch64-linux-gnu-`): `.bss` and the boot stack are placed in the RW segment, so no empty segment is emitted at address 0
+- QEMU `virt` runs with `-nic none`: no network card (and no option ROM) is needed yet
+- Host unit test builds cleanly with GCC's format checker
+
 ### Planned
 - Phase 1: boot code (AArch64 assembly), `kernel_main`, UART output, "Hello from OS-001!" in QEMU
 - Board support: Raspberry Pi 4 (`raspi4b`) and QEMU `virt`

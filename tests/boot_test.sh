@@ -21,7 +21,7 @@ status=0
 
 qemu_args() {
     case "$1" in
-    virt) echo "-M virt -cpu cortex-a72 -m 1G -kernel build/virt/os001.elf" ;;
+    virt) echo "-M virt -cpu cortex-a72 -m 1G -nic none -kernel build/virt/os001.elf" ;;
     rpi4) echo "-M raspi4b -kernel build/rpi4/kernel8.img" ;;
     *) return 1 ;;
     esac
