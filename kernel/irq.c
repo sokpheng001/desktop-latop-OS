@@ -19,6 +19,7 @@ struct irq_entry {
 };
 
 static struct irq_entry irq_table[IRQ_MAX];
+static u64 unhandled_count;
 
 bool irq_register(u32 irq, irq_handler_fn handler, void *ctx)
 {
@@ -46,7 +47,13 @@ void irq_dispatch(void)
 			 */
 			kprintf("IRQ %d has no handler; disabling it\n", irq);
 			hal_irq_disable((u32)irq);
+			unhandled_count++;
 		}
 		hal_irq_complete(token);
 	}
+}
+
+u64 irq_unhandled_count(void)
+{
+	return unhandled_count;
 }

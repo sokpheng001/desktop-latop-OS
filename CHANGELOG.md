@@ -22,13 +22,17 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Kernel self-tests built with `make KERNEL_TEST=<name>` into `build/<board>-test-<name>/`; first one, `fault`, raises a breakpoint after boot
 - Boot test runs `virt-fault` and `rpi4-fault` and checks the exception report
 - GICv2 interrupt controller driver (`drivers/gicv2/`, from Arm IHI 0048B): distributor and CPU interface reset, enable/disable, acknowledge/end-of-interrupt, SGIs; used for QEMU `virt` (GICv2 at 0x08000000) and the Pi 4 GIC-400 (0xFF840000)
-- HAL interrupt API (`hal_irq_enable`, `hal_irq_disable`, `hal_irq_claim`, `hal_irq_complete`, `hal_irq_raise_soft`) and kernel IRQ dispatch with a per-interrupt handler table (`kernel/irq.c`, `irq_register`)
+- HAL interrupt API (`hal_irq_enable`, `hal_irq_disable`, `hal_irq_claim`, `hal_irq_complete`) and kernel IRQ dispatch with a per-interrupt handler table (`kernel/irq.c`, `irq_register`)
 - IRQ exceptions are dispatched and return to the interrupted code; `arch_irq_enable`, `arch_irq_disable`, `arch_wait_for_interrupt`; IRQs are unmasked after boot
 - Self-test `KERNEL_TEST=irq` and boot-test runs `virt-irq`, `rpi4-irq`: a software interrupt must arrive through the GIC and return
 - Arm generic timer driver (`drivers/arm_gtimer/`): EL1 physical timer, drift-free periodic deadlines, system counter read-out; HAL timer/counter API (`hal_timer_*`, `hal_counter`, `hal_counter_freq`) on both boards (timer interrupt ID 30)
 - Kernel time (`kernel/time.c`): 100 Hz tick counter and uptime in milliseconds from the hardware counter; the banner shows tick rate and counter frequency
 - `kernel_main` no longer returns: after boot it sleeps in `wfi` waiting for interrupts
 - Self-test `KERNEL_TEST=timer` and boot-test runs `virt-timer`, `rpi4-timer`: 50 ticks must take 500 ms (within 10%) by the hardware counter
+- Exception reports decode the fault status code of instruction and data aborts (translation, access flag, permission, external, alignment)
+- Self-test `KERNEL_TEST=abort` and boot-test runs `virt-abort`, `rpi4-abort`: a misaligned load must be reported as an alignment-fault data abort with FAR equal to the address
+- IRQ self-test also checks that an interrupt without a handler is reported once and disabled; `hal_irq_raise` (SGI or software set-pending), `hal_irq_count`, `gicv2_set_pending`, `irq_unhandled_count`, `HIDE_VALUE()`
+- Test overview in `tests/README.md`
 
 ### Changed
 - Version string set to `0.2.0-dev` for Phase 2 work

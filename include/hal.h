@@ -33,8 +33,10 @@ void hal_irq_disable(u32 irq);
  */
 int hal_irq_claim(u32 *token);
 void hal_irq_complete(u32 token);
-/* Raise software interrupt sgi on this core (used by self-tests and, later, SMP). */
-void hal_irq_raise_soft(u32 sgi);
+/* Make irq pending from software: an SGI is sent to this core, any other ID is set pending. */
+void hal_irq_raise(u32 irq);
+/* Number of interrupt IDs the controller supports. */
+u32 hal_irq_count(void);
 
 /* Periodic timer and free-running counter. */
 u32 hal_timer_irq(void);      /* interrupt number of the tick timer */

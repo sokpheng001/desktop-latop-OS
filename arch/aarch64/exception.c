@@ -17,6 +17,13 @@
 #define ESR_EC_MASK  0x3fu
 #define ESR_ISS_MASK 0x1ffffffu
 
+/* Exception classes for aborts, whose ISS[5:0] holds a fault status code (DFSC/IFSC). */
+#define EC_IABT_LOWER 0x20u
+#define EC_IABT_CUR   0x21u
+#define EC_DABT_LOWER 0x24u
+#define EC_DABT_CUR   0x25u
+#define ESR_FSC_MASK  0x3fu
+
 extern char exception_vectors[];
 
 struct ec_name {
@@ -42,6 +49,16 @@ static const struct ec_name ec_names[] = {
     {0x3c, "Breakpoint (BRK)"},
 };
 
+/* Abort fault status codes (ESR_EL1 ISS encoding for instruction and data aborts). */
+static const struct ec_name fsc_names[] = {
+    {0x04, "Translation fault, level 0"}, {0x05, "Translation fault, level 1"},
+    {0x06, "Translation fault, level 2"}, {0x07, "Translation fault, level 3"},
+    {0x09, "Access flag fault, level 1"}, {0x0a, "Access flag fault, level 2"},
+    {0x0b, "Access flag fault, level 3"}, {0x0d, "Permission fault, level 1"},
+    {0x0e, "Permission fault, level 2"},  {0x0f, "Permission fault, level 3"},
+    {0x10, "Synchronous external abort"}, {0x21, "Alignment fault"},
+};
+
 static const char *const group_names[] = {
     "current EL, SP_EL0",
     "current EL, SP_ELx",
@@ -51,13 +68,18 @@ static const char *const group_names[] = {
 
 static const char *const type_names[] = {"Synchronous", "IRQ", "FIQ", "SError"};
 
-static const char *ec_to_name(u32 ec)
+static const char *lookup(const struct ec_name *table, usize n, u32 code)
 {
-	for (usize i = 0; i < ARRAY_SIZE(ec_names); i++) {
-		if (ec_names[i].ec == ec)
-			return ec_names[i].name;
+	for (usize i = 0; i < n; i++) {
+		if (table[i].ec == code)
+			return table[i].name;
 	}
 	return "Other";
+}
+
+static bool ec_is_abort(u32 ec)
+{
+	return ec == EC_IABT_LOWER || ec == EC_IABT_CUR || ec == EC_DABT_LOWER || ec == EC_DABT_CUR;
 }
 
 void arch_exception_init(void)
@@ -78,8 +100,14 @@ void arch_exception_handler(struct exc_frame *frame, u64 kind)
 	/* Anything else is a bug: report it and stop. */
 	kprintf("\n*** Unexpected exception: %s (%s)\n", type_names[kind % EXC_TYPES_PER_GROUP],
 		group_names[kind / EXC_TYPES_PER_GROUP]);
-	kprintf("ESR_EL1:  %p  EC=0x%02x %s  ISS=0x%07x\n", (void *)frame->esr, ec, ec_to_name(ec),
-		(u32)frame->esr & ESR_ISS_MASK);
+	kprintf("ESR_EL1:  %p  EC=0x%02x %s  ISS=0x%07x\n", (void *)frame->esr, ec,
+		lookup(ec_names, ARRAY_SIZE(ec_names), ec), (u32)frame->esr & ESR_ISS_MASK);
+	if (ec_is_abort(ec)) {
+		u32 fsc = (u32)frame->esr & ESR_FSC_MASK;
+
+		kprintf("FSC:      0x%02x %s\n", fsc,
+			lookup(fsc_names, ARRAY_SIZE(fsc_names), fsc));
+	}
 	kprintf("ELR_EL1:  %p\n", (void *)frame->elr);
 	kprintf("FAR_EL1:  %p  (valid for aborts only)\n", (void *)frame->far);
 	kprintf("SPSR_EL1: %p\n", (void *)frame->spsr);

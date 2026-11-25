@@ -114,9 +114,17 @@ void hal_irq_complete(u32 token)
 	gicv2_eoi(&gic, token);
 }
 
-void hal_irq_raise_soft(u32 sgi)
+void hal_irq_raise(u32 irq)
 {
-	gicv2_send_sgi_self(&gic, sgi);
+	if (irq < GICV2_NUM_SGIS)
+		gicv2_send_sgi_self(&gic, irq);
+	else
+		gicv2_set_pending(&gic, irq);
+}
+
+u32 hal_irq_count(void)
+{
+	return gicv2_num_irqs(&gic);
 }
 
 u32 hal_timer_irq(void)

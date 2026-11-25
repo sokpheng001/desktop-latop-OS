@@ -17,6 +17,7 @@
 #define GICD_TYPER	0x004
 #define GICD_ISENABLER	0x100
 #define GICD_ICENABLER	0x180
+#define GICD_ISPENDR	0x200
 #define GICD_ICPENDR	0x280
 #define GICD_IPRIORITYR 0x400
 #define GICD_ITARGETSR	0x800
@@ -112,6 +113,12 @@ u32 gicv2_iar_irq(u32 iar)
 void gicv2_eoi(const struct gicv2 *gic, u32 iar)
 {
 	mmio_write32(gic->cpu_base + GICC_EOIR, iar);
+}
+
+void gicv2_set_pending(const struct gicv2 *gic, u32 irq)
+{
+	mmio_write32(gic->dist_base + GICD_ISPENDR + (irq / IRQS_PER_WORD) * 4,
+		     1u << (irq % IRQS_PER_WORD));
 }
 
 void gicv2_send_sgi_self(const struct gicv2 *gic, u32 sgi)

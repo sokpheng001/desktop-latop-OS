@@ -11,8 +11,11 @@
 #   el2    boot virt with virtualization on, so the kernel is entered at EL2
 #   fault  self-test kernel (make KERNEL_TEST=fault): a deliberate exception must
 #          be reported by the exception handler
+#   abort  self-test kernel (make KERNEL_TEST=abort): a misaligned load must be
+#          reported as a data abort (alignment fault) with FAR = the address
 #   irq    self-test kernel (make KERNEL_TEST=irq): a software interrupt must go
-#          through the interrupt controller, the IRQ vector and dispatch, and return
+#          through the interrupt controller, the IRQ vector and dispatch, and return;
+#          an interrupt without a handler must be reported once and disabled
 #   timer  self-test kernel (make KERNEL_TEST=timer): 50 timer ticks must arrive at
 #          100 Hz, checked against the hardware counter
 
@@ -20,7 +23,7 @@ set -u
 
 QEMU=${QEMU:-qemu-system-aarch64}
 BOOT_TIMEOUT=${BOOT_TIMEOUT:-10}
-RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-irq rpi4-irq virt-timer rpi4-timer"}
+RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-abort rpi4-abort virt-irq rpi4-irq virt-timer rpi4-timer"}
 LOG_DIR=build/test
 MAKE=${MAKE:-make}
 
@@ -60,10 +63,21 @@ for run in $RUNS; do
             "EC=0x3c Breakpoint (BRK)" \
             "*** System halted.")
         ;;
+    abort)
+        make_args="$make_args KERNEL_TEST=abort"
+        build_dir="build/$board-test-abort"
+        expect=$(printf '%s\n' "$expect" \
+            "*** Unexpected exception: Synchronous (current EL, SP_ELx)" \
+            "EC=0x25 Data abort from current EL" \
+            "FSC:      0x21 Alignment fault" \
+            "*** System halted.")
+        ;;
     irq)
         make_args="$make_args KERNEL_TEST=irq"
         build_dir="build/$board-test-irq"
-        expect=$(printf '%s\n' "$expect" "Self-test: IRQ 1 received and returned")
+        expect=$(printf '%s\n' "$expect" "Self-test: IRQ 1 received and returned" \
+            "has no handler; disabling it" \
+            "reported once and disabled")
         ;;
     timer)
         make_args="$make_args KERNEL_TEST=timer"
@@ -114,6 +128,14 @@ for run in $RUNS; do
     missing=$(printf '%s\n' "$expect" | while IFS= read -r line; do
         grep -qF -- "$line" "$log" || echo "$line"
     done)
+    # The abort report must name the exact address the self-test loaded from.
+    if [ "$variant" = abort ]; then
+        addr=$(sed -n 's/.*misaligned load from \(0x[0-9a-f]*\).*/\1/p' "$log" | head -n 1)
+        if [ -z "$addr" ] || ! grep -qF "FAR_EL1:  $addr" "$log"; then
+            missing=$(printf '%s\n' "$missing" "FAR_EL1 equal to the misaligned address")
+            missing=${missing#"${missing%%[![:space:]]*}"}
+        fi
+    fi
     if [ -z "$missing" ]; then
         echo "  PASS    boot $run"
     else

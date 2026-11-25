@@ -29,7 +29,7 @@ Coarse items (later phases) are split into small steps before work on them start
 - [x] Exception vector table; print ESR/ELR/FAR on any unexpected exception
 - [x] Interrupt controller: GIC on `virt`, GIC-400 on `rpi4`, behind the HAL
 - [x] ARM generic timer interrupt (100 Hz tick) and uptime counter
-- [ ] Tests for each of the above in `tests/`
+- [x] Tests for each of the above in `tests/`
 
 ## Phase 3 — Memory (v0.3.0)
 - [ ] Read RAM size from the Device Tree passed by firmware / QEMU

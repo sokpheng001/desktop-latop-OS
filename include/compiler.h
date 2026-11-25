@@ -33,6 +33,9 @@
 
 #define UNREACHABLE() __builtin_unreachable()
 
+/* Make the compiler forget what it knows about var's value (e.g. its alignment). */
+#define HIDE_VALUE(var) __asm__("" : "+r"(var))
+
 /* Deliberately raise an exception (a BRK instruction on AArch64). */
 #define TRAP() __builtin_trap()
 
