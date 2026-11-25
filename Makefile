@@ -41,9 +41,12 @@ OBJCOPY := $(CROSS_COMPILE)objcopy
 
 # -mgeneral-regs-only: FP/SIMD is not enabled at boot, so the compiler must not use it.
 # -mstrict-align: with the MMU off all memory is Device type, where unaligned access faults.
+# -fno-tree-loop-distribute-patterns: stop GCC turning the loop inside memset into a call
+# to memset (infinite recursion).
 # -ffile-prefix-map: keep absolute build paths out of debug info (reproducible builds).
 CPUFLAGS := -mcpu=cortex-a72 -mgeneral-regs-only -mstrict-align
 CFLAGS   := -std=c17 -ffreestanding -fno-builtin -fno-stack-protector -fno-pie \
+	    -fno-tree-loop-distribute-patterns \
 	    -O2 -g -Wall -Wextra -Werror $(CPUFLAGS) \
 	    -ffile-prefix-map=$(CURDIR)=. \
 	    -Iinclude -Iboard/$(BOARD) \
