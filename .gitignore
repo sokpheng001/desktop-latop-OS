@@ -5,3 +5,6 @@ build/
 *.img
 *.bin
 .DS_Store
+
+# Local work-session lock
+.worklock

@@ -12,6 +12,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- Roadmap ([docs/ROADMAP.md](docs/ROADMAP.md)): phases 1-7 broken into small steps
+- Branch workflow: daily work on `dev`, finished and tested phases merged to `main`
+
 ### Planned
 - Phase 1: boot code (AArch64 assembly), `kernel_main`, UART output, "Hello from OS-001!" in QEMU
 - Board support: Raspberry Pi 4 (`raspi4b`) and QEMU `virt`
