@@ -13,6 +13,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Planned
+- Phase 3 (v0.3.0): RAM size from the Device Tree, physical page allocator, MMU on, kernel heap
+
+## [0.2.0] - 2026-11-25
+
+Exceptions and time: the kernel runs at EL1 on both boards, reports any CPU exception with a
+decoded register dump, handles interrupts through the GIC and keeps a 100 Hz tick.
+
 ### Added
 - Boot drops from EL2 to EL1 when the loader enters at EL2 (Pi 4 firmware, QEMU `raspi4b`, `virt` with virtualization): EL1 runs AArch64 with no traps to EL2, timer and counter usable from EL1, interrupts masked
 - AArch64 system register constants (`include/arch/aarch64/sysregs.h`) and architecture interface `include/arch.h` (`arch_current_el`); the boot banner shows the exception level
@@ -33,12 +41,6 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Self-test `KERNEL_TEST=abort` and boot-test runs `virt-abort`, `rpi4-abort`: a misaligned load must be reported as an alignment-fault data abort with FAR equal to the address
 - IRQ self-test also checks that an interrupt without a handler is reported once and disabled; `hal_irq_raise` (SGI or software set-pending), `hal_irq_count`, `gicv2_set_pending`, `irq_unhandled_count`, `HIDE_VALUE()`
 - Test overview in `tests/README.md`
-
-### Changed
-- Version string set to `0.2.0-dev` for Phase 2 work
-
-### Planned
-- Phase 2 (v0.2.0): drop from EL2 to EL1, exception vectors, GIC interrupt controller, generic timer tick
 
 ## [0.1.0] - 2026-11-25
 
@@ -84,6 +86,7 @@ First boot: OS-001 boots on QEMU `virt` and Raspberry Pi 4 (`raspi4b`) and print
 - `README.md`, `AUTHORS`, `.gitignore`
 - This changelog
 
-[Unreleased]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/sokpheng001/desktop-latop-OS/releases/tag/v0.0.1
