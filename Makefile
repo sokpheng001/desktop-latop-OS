@@ -48,7 +48,7 @@ CFLAGS   := -std=c17 -ffreestanding -fno-builtin -fno-stack-protector -fno-pie \
 	    -Iinclude -Iboard/$(BOARD) \
 	    -MMD -MP $(CFLAGS_EXTRA)
 ASFLAGS  := $(CFLAGS) -D__ASSEMBLY__
-LDFLAGS  := -nostdlib -static -no-pie -Wl,--build-id=none -Wl,-z,noexecstack
+LDFLAGS  := -Wl,-L,arch/$(ARCH) -nostdlib -static -no-pie -Wl,--build-id=none -Wl,--fatal-warnings -Wl,-z,noexecstack
 LDLIBS   := -lgcc
 
 # ---------------------------------------------------------------------------
@@ -56,6 +56,7 @@ LDLIBS   := -lgcc
 # ---------------------------------------------------------------------------
 BUILD_DIR := build/$(BOARD)
 LDSCRIPT  := board/$(BOARD)/linker.ld
+LDSCRIPTS := $(LDSCRIPT) arch/$(ARCH)/kernel.ld
 
 SRC_DIRS  := arch/$(ARCH) board/$(BOARD) kernel lib
 # Each board lists the drivers it needs in board/<board>/board.mk (DRIVERS := pl011 ...).
@@ -96,7 +97,7 @@ else
 all: $(IMG)
 endif
 
-$(ELF): $(OBJS) $(LDSCRIPT)
+$(ELF): $(OBJS) $(LDSCRIPTS)
 	$(call echo_cmd,LD,$@)
 	$(Q)$(CC) $(CFLAGS) $(LDFLAGS) -T $(LDSCRIPT) -o $@ $(OBJS) $(LDLIBS)
 
