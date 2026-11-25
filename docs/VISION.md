@@ -7,6 +7,17 @@
 
 > **A private, lightweight desktop OS where AI is built in and runs entirely on your own machine.**
 
+## Two systems in one
+
+OS-001 is **both a complete normal operating system and a human-AI system**:
+
+- **As a normal OS** it does everything people expect from a desktop: boot, files, apps, windows,
+  a shell, networking, devices, users and permissions. All of it works with AI switched off.
+- **As a human-AI system** the user can work *with* the computer in plain language: ask, delegate
+  and get explanations, with the AI acting as a built-in OS service under the user's control.
+
+Both are first-class. The AI layer is built on top of a solid conventional core, never instead of it.
+
 ## Why this OS exists
 
 | Today's desktops | OS-001 |
