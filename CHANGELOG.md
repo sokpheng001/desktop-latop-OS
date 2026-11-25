@@ -28,6 +28,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `include/kernel.h` and a minimal `kernel/main.c` (`kernel_main` entry point)
 - Vision: OS-001 is both a complete normal OS and a human-AI system ([docs/VISION.md](docs/VISION.md))
 
+### Changed
+- Working hours for daily progress reports: Monday to Friday, 5 PM to 11:59 PM
+
 ### Planned
 - Phase 1: boot code (AArch64 assembly), `kernel_main`, UART output, "Hello from OS-001!" in QEMU
 - Board support: Raspberry Pi 4 (`raspi4b`) and QEMU `virt`
