@@ -13,6 +13,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- Version string set to `0.3.0-dev` for Phase 3 work
+
 ### Planned
 - Phase 3 (v0.3.0): RAM size from the Device Tree, physical page allocator, MMU on, kernel heap
 
