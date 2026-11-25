@@ -12,6 +12,7 @@
 #include "kernel.h"
 #include "lib/kprintf.h"
 #include "selftest.h"
+#include "time.h"
 #include "version.h"
 
 /* Image bounds from the linker script (arch/aarch64/kernel.ld). */
@@ -36,7 +37,14 @@ void kernel_main(uptr dtb)
 	kprintf("Hello from OS-001!\n");
 
 	/* Each source is still disabled at the controller until a driver registers it. */
+	time_init();
 	arch_irq_enable();
+	kprintf("Timer:  %u Hz tick, counter %lu Hz, uptime %lu ms\n", TIME_TICK_HZ,
+		(unsigned long)hal_counter_freq(), (unsigned long)time_uptime_ms());
 
 	selftest_run();
+
+	/* Nothing else to do yet: sleep until the next interrupt, forever. */
+	for (;;)
+		arch_wait_for_interrupt();
 }

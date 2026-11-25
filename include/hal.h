@@ -36,6 +36,13 @@ void hal_irq_complete(u32 token);
 /* Raise software interrupt sgi on this core (used by self-tests and, later, SMP). */
 void hal_irq_raise_soft(u32 sgi);
 
+/* Periodic timer and free-running counter. */
+u32 hal_timer_irq(void);      /* interrupt number of the tick timer */
+void hal_timer_start(u32 hz); /* start periodic interrupts at hz */
+void hal_timer_ack(void);     /* from the timer interrupt: clear it and schedule the next */
+u64 hal_counter(void);	      /* monotonic counter value */
+u64 hal_counter_freq(void);   /* counter frequency in Hz */
+
 /* Short, stable board identifier, e.g. "qemu-virt" (shown at boot and in logs). */
 const char *hal_board_name(void);
 

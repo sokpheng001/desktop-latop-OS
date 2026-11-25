@@ -9,6 +9,7 @@
 #ifndef OS001_KERNEL_H
 #define OS001_KERNEL_H
 
+#include "compiler.h"
 #include "types.h"
 
 #ifndef __ASSEMBLY__
@@ -18,7 +19,7 @@
  * a valid stack and .bss cleared. dtb is the Device Tree address, or 0 if the loader
  * did not pass one.
  */
-void kernel_main(uptr dtb);
+void kernel_main(uptr dtb) ATTR_NORETURN;
 
 #endif /* !__ASSEMBLY__ */
 

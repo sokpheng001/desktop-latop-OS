@@ -20,4 +20,11 @@
 #define BOARD_GICD_BASE 0x08000000ul
 #define BOARD_GICC_BASE 0x08010000ul
 
+/*
+ * EL1 non-secure physical timer: PPI 14, GIC interrupt ID 30. This assignment is
+ * the one Arm recommends for the generic timer (Arm Server Base System Architecture)
+ * and the one the board's Device Tree uses.
+ */
+#define BOARD_TIMER_IRQ 30u
+
 #endif /* OS001_BOARD_H */

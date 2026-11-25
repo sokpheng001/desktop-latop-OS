@@ -7,6 +7,7 @@
  */
 
 #include "board.h"
+#include "drivers/arm_gtimer.h"
 #include "drivers/gicv2.h"
 #include "drivers/pl011.h"
 #include "hal.h"
@@ -73,4 +74,29 @@ void hal_irq_complete(u32 token)
 void hal_irq_raise_soft(u32 sgi)
 {
 	gicv2_send_sgi_self(&gic, sgi);
+}
+
+u32 hal_timer_irq(void)
+{
+	return BOARD_TIMER_IRQ;
+}
+
+void hal_timer_start(u32 hz)
+{
+	arm_gtimer_start(hz);
+}
+
+void hal_timer_ack(void)
+{
+	arm_gtimer_rearm();
+}
+
+u64 hal_counter(void)
+{
+	return arm_gtimer_count();
+}
+
+u64 hal_counter_freq(void)
+{
+	return arm_gtimer_freq();
 }

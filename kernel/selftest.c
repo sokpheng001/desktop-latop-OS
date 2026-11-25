@@ -13,6 +13,7 @@
 #include "irq.h"
 #include "lib/kprintf.h"
 #include "selftest.h"
+#include "time.h"
 
 #if defined(KERNEL_TEST_IRQ)
 /* Software-generated interrupt used by the test; any of 0-15 would do. */
@@ -27,6 +28,13 @@ static void selftest_irq_handler(u32 irq, void *ctx)
 	(void)ctx;
 	irq_seen = irq + 1;
 }
+#endif
+
+#if defined(KERNEL_TEST_TIMER)
+/* Ticks to wait for: half a second at 100 Hz. */
+#define SELFTEST_TICKS	       50u
+/* Allowed difference between tick time and counter time, in percent. */
+#define SELFTEST_TOLERANCE_PCT 10u
 #endif
 
 void selftest_run(void)
@@ -46,5 +54,24 @@ void selftest_run(void)
 		kprintf("Self-test: IRQ %u received and returned\n", SELFTEST_SGI);
 	else
 		kprintf("Self-test: IRQ FAILED (seen=%u)\n", irq_seen);
+#endif
+#if defined(KERNEL_TEST_TIMER)
+	/* Ticks must arrive, and at the right rate measured against the hardware counter. */
+	u64 start_ticks = time_ticks();
+	u64 start_ms = time_uptime_ms();
+
+	while (time_ticks() - start_ticks < SELFTEST_TICKS)
+		arch_wait_for_interrupt();
+
+	u64 elapsed_ms = time_uptime_ms() - start_ms;
+	u64 expect_ms = SELFTEST_TICKS * 1000u / TIME_TICK_HZ;
+	u64 slack_ms = expect_ms * SELFTEST_TOLERANCE_PCT / 100u;
+
+	if (elapsed_ms + slack_ms >= expect_ms && elapsed_ms <= expect_ms + slack_ms)
+		kprintf("Self-test: timer OK (%u ticks in %lu ms)\n", SELFTEST_TICKS,
+			(unsigned long)elapsed_ms);
+	else
+		kprintf("Self-test: timer FAILED (%u ticks in %lu ms, expected %lu ms)\n",
+			SELFTEST_TICKS, (unsigned long)elapsed_ms, (unsigned long)expect_ms);
 #endif
 }
