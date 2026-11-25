@@ -15,6 +15,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 - Roadmap ([docs/ROADMAP.md](docs/ROADMAP.md)): phases 1-7 broken into small steps
 - Branch workflow: daily work on `dev`, finished and tested phases merged to `main`
+- Contribution rules ([CONTRIBUTING.md](CONTRIBUTING.md)): from-scratch originality policy, author header on every file, C17 code style, industry-standard Makefile conventions, testing and git workflow
+- `.editorconfig` and `.clang-format` shared editor and formatting settings
+- Daily progress reports in `docs/progress/`
 
 ### Planned
 - Phase 1: boot code (AArch64 assembly), `kernel_main`, UART output, "Hello from OS-001!" in QEMU
