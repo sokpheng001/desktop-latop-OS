@@ -22,6 +22,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Research foundations ([docs/RESEARCH.md](docs/RESEARCH.md)): 26 verified papers mapped to OS-001 subsystems and roadmap phases
 - Source folder structure (`arch/`, `board/`, `kernel/`, `drivers/`, `lib/`, `include/`, `tests/`), each with a README describing what belongs there
 - `Makefile`: out-of-tree builds in `build/<board>/`, `BOARD`, `CROSS_COMPILE`, `V=1`, `CFLAGS_EXTRA`, `-MMD -MP` header dependencies, `-Werror`, reproducible output (`-ffile-prefix-map`, no build ID), per-board driver selection via `board/<board>/board.mk`; targets `all run debug test format check-format clean distclean help`
+- Base headers: `include/types.h` (fixed-width types with size checks), `include/compiler.h` (attribute and helper macros), `include/mmio.h` (8/16/32/64-bit MMIO accessors and barriers)
 - Vision: OS-001 is both a complete normal OS and a human-AI system ([docs/VISION.md](docs/VISION.md))
 
 ### Planned
