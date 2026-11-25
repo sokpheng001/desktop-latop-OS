@@ -8,6 +8,8 @@
 A private, lightweight desktop OS where AI is built in and runs entirely on your own machine.
 Our own kernel, written from scratch. Raspberry Pi first, then x86_64 PCs, and VMs everywhere.
 
+**Project timeline:** 2024 – present
+
 - [Vision](docs/VISION.md): purpose and architecture
 - [Hardware](docs/HARDWARE.md): target platforms and requirements
 - [Roadmap](docs/ROADMAP.md): planned work, step by step
@@ -19,3 +21,5 @@ Our own kernel, written from scratch. Raspberry Pi first, then x86_64 PCs, and V
 ## Authors
 
 kwan, oda, sokpheng001 (see [AUTHORS](AUTHORS))
+
+Copyright © 2024–present kwan, oda, sokpheng001. All rights reserved.
