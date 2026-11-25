@@ -1,0 +1,19 @@
+/*
+ * Project: OS-001
+ * Date: 2026-11-25
+ * Authors: kwan, oda, sokpheng001
+ *
+ * Minimal Device Tree for booting OS-001 on QEMU raspi4b, which only passes a DTB
+ * (in x0) when given one. On real hardware the Pi firmware passes its own.
+ * QEMU fills in the memory node itself: the ARM-visible RAM below the VideoCore
+ * split (960 MiB on its 2 GB model), so none is described here.
+ */
+
+/dts-v1/;
+
+/ {
+	#address-cells = <2>;
+	#size-cells = <1>;
+	compatible = "raspberrypi,4-model-b", "brcm,bcm2711";
+	model = "Raspberry Pi 4 Model B (OS-001 QEMU description)";
+};

@@ -37,10 +37,19 @@ board_name() {
     esac
 }
 
+# RAM the kernel must find in the Device Tree. virt: QEMU's own DTB (-m 1G).
+# rpi4: QEMU fills the memory node with the RAM below the VideoCore split.
+board_ram() {
+    case "$1" in
+    virt) echo "RAM:    1024 MiB in 1 region" ;;
+    rpi4) echo "RAM:    960 MiB in 1 region" ;;
+    esac
+}
+
 # Lines every kernel must print; the kernel must always end up at EL1.
 common_expect() {
-    printf '%s\n' "Board:  $(board_name "$1")" "EL:     1" "Hello from OS-001!" \
-        "Timer:  100 Hz tick"
+    printf '%s\n' "Board:  $(board_name "$1")" "EL:     1" "$(board_ram "$1")" \
+        "Hello from OS-001!" "Timer:  100 Hz tick"
 }
 
 for run in $RUNS; do
@@ -91,9 +100,10 @@ for run in $RUNS; do
         ;;
     esac
 
+    # Raw images: QEMU follows the arm64 boot protocol and passes the Device Tree in x0.
     case "$board" in
-    virt) qemu_args="-M virt$machine_opts -cpu cortex-a72 -m 1G -nic none -kernel $build_dir/os001.elf" ;;
-    rpi4) qemu_args="-M raspi4b$machine_opts -kernel $build_dir/kernel8.img" ;;
+    virt) qemu_args="-M virt$machine_opts -cpu cortex-a72 -m 1G -nic none -kernel $build_dir/kernel8.img" ;;
+    rpi4) qemu_args="-M raspi4b$machine_opts -kernel $build_dir/kernel8.img -dtb $build_dir/qemu.dtb" ;;
     *)
         echo "  FAIL    boot $run: unknown board '$board'"
         status=1

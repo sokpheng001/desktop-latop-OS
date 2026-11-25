@@ -30,7 +30,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            make gcc libc6-dev gcc-aarch64-linux-gnu qemu-system-arm \
+            make gcc libc6-dev gcc-aarch64-linux-gnu qemu-system-arm device-tree-compiler \
             python3 python3-venv ca-certificates
           python3 -m venv /opt/fmt
           /opt/fmt/bin/pip install --quiet clang-format==23.1.5

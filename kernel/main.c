@@ -11,6 +11,7 @@
 #include "hal.h"
 #include "kernel.h"
 #include "lib/kprintf.h"
+#include "mem.h"
 #include "selftest.h"
 #include "time.h"
 #include "version.h"
@@ -34,6 +35,7 @@ void kernel_main(uptr dtb)
 		kprintf("DTB:    %p\n", (void *)dtb);
 	else
 		kprintf("DTB:    not passed by the loader\n");
+	mem_init(dtb);
 	kprintf("Hello from OS-001!\n");
 
 	/* Each source is still disabled at the controller until a driver registers it. */

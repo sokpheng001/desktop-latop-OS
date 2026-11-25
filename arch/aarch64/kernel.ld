@@ -66,6 +66,10 @@ SECTIONS
 
 	kernel_end = .;
 
+	/* Values for the arm64 image header in boot.S. */
+	kernel_image_size = kernel_end - kernel_start;
+	kernel_text_offset = KERNEL_BASE % 0x200000;
+
 	/DISCARD/ : {
 		*(.comment)
 		*(.note .note.*)

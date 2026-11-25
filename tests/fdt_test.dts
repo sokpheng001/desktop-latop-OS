@@ -1,0 +1,42 @@
+/*
+ * Project: OS-001
+ * Date: 2026-11-25
+ * Authors: kwan, oda, sokpheng001
+ *
+ * Device Tree used by tests/lib_test.c to check lib/fdt.c: 64-bit addresses and
+ * sizes, a memory node with two ranges, a second memory node found only by its
+ * device_type, and nested reg properties that must not be taken as RAM.
+ */
+
+/dts-v1/;
+
+/ {
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			reg = <0>;
+		};
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x00000000 0x0 0x3c000000>,
+		      <0x0 0x40000000 0x1 0x00000000>;
+	};
+
+	sdram@200000000 {
+		device_type = "memory";
+		reg = <0x2 0x00000000 0x0 0x10000000>;
+	};
+
+	soc {
+		serial@fe201000 {
+			reg = <0x0 0xfe201000 0x0 0x200>;
+		};
+	};
+};

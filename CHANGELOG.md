@@ -13,7 +13,15 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- RAM discovery from the Device Tree: Flattened Devicetree reader `lib/fdt.c` (written from the Devicetree Specification v0.4, chapter 5) and `kernel/mem.c`; the banner lists every RAM range and the total
+- arm64 kernel image header at the start of the image: QEMU and the Pi firmware load it as a kernel and pass the Device Tree address in x0
+- `board/rpi4/qemu.dts`, built with `dtc` into `build/rpi4/qemu.dtb` for QEMU runs (QEMU raspi4b only passes a DTB when given one)
+- Host unit tests for the Device Tree reader (`tests/fdt_test.dts`); boot tests check the RAM each board reports
+
 ### Changed
+- QEMU runs and boot tests use the raw `kernel8.img` on both boards (the ELF is still built for debugging)
+- `dtc` is now a build requirement; CI installs `device-tree-compiler`
 - Version string set to `0.3.0-dev` for Phase 3 work
 
 ### Planned

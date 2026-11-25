@@ -3,15 +3,23 @@
  * Date: 2026-11-25
  * Authors: kwan, oda, sokpheng001
  *
- * Host unit tests for lib/ (string helpers and the kprintf formatter).
- * Built and run on the development machine by tests/lib_test.sh.
+ * Host unit tests for lib/ (string helpers, the kprintf formatter and the
+ * Device Tree reader). Built and run on the development machine by tests/lib_test.sh,
+ * which passes the compiled tests/fdt_test.dts as the first argument.
  */
 
+#include "lib/fdt.h"
 #include "lib/kprintf.h"
 #include "lib/string.h"
 
-/* Only libc function used, declared by hand so no host headers clash with ours. */
+/* The few host libc/POSIX functions used, declared by hand so no host headers clash with ours. */
 int puts(const char *s);
+int open(const char *path, int flags, ...);
+long read(int fd, void *buf, unsigned long n);
+int close(int fd);
+
+#define HOST_O_RDONLY 0
+#define FDT_BUF_SIZE  4096
 
 #define BUF_SIZE 256
 
@@ -113,10 +121,49 @@ static void test_kprintf(void)
 	check_fmt("  ab", "%4s", "ab");
 }
 
-int main(void)
+static u8 fdt_buf[FDT_BUF_SIZE] ATTR_ALIGNED(8);
+
+static void test_fdt(const char *path)
+{
+	int fd = open(path, HOST_O_RDONLY);
+	long n = fd >= 0 ? read(fd, fdt_buf, sizeof(fdt_buf)) : -1;
+	struct fdt_mem_region r[4];
+
+	if (fd >= 0)
+		close(fd);
+	check(n > 0, "FAIL fdt: cannot read test DTB");
+	if (n <= 0)
+		return;
+
+	check(fdt_valid(fdt_buf), "FAIL fdt_valid on a good DTB");
+	check(fdt_total_size(fdt_buf) == (u32)n, "FAIL fdt_total_size");
+
+	int count = fdt_memory_regions(fdt_buf, r, 4);
+
+	check(count == 3, "FAIL fdt_memory_regions count (expected 3)");
+	if (count == 3) {
+		check(r[0].base == 0x0 && r[0].size == 0x3c000000, "FAIL fdt region 0");
+		check(r[1].base == 0x40000000 && r[1].size == 0x100000000, "FAIL fdt region 1");
+		check(r[2].base == 0x200000000 && r[2].size == 0x10000000, "FAIL fdt region 2");
+	}
+	check(fdt_memory_regions(fdt_buf, r, 1) == 1, "FAIL fdt_memory_regions respects max");
+
+	/* A damaged header must be rejected, not parsed. */
+	fdt_buf[0] ^= 0xff;
+	check(!fdt_valid(fdt_buf), "FAIL fdt_valid accepts a bad magic");
+	check(fdt_memory_regions(fdt_buf, r, 4) == -1, "FAIL fdt_memory_regions on bad magic");
+	fdt_buf[0] ^= 0xff;
+	check(!fdt_valid(NULL), "FAIL fdt_valid(NULL)");
+}
+
+int main(int argc, char **argv)
 {
 	test_string();
 	test_kprintf();
+	if (argc > 1)
+		test_fdt(argv[1]);
+	else
+		check(false, "FAIL lib_test: no test DTB given");
 	if (failures) {
 		puts("lib_test: FAILED");
 		return 1;

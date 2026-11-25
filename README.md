@@ -22,7 +22,8 @@ Our own kernel, written from scratch. Raspberry Pi first, then x86_64 PCs, and V
 ## Build and run
 
 Needs `aarch64-elf-gcc` (or `aarch64-linux-gnu-gcc` with `CROSS_COMPILE=aarch64-linux-gnu-`),
-`qemu-system-aarch64` (9.0 or newer for the Raspberry Pi 4 machine) and `clang-format`.
+`qemu-system-aarch64` (9.0 or newer for the Raspberry Pi 4 machine), `dtc` (Device Tree compiler)
+and `clang-format`.
 
 ```sh
 make                 # build for QEMU virt (default)

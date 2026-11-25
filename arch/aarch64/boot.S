@@ -13,10 +13,32 @@
 /* MPIDR_EL1.Aff0, bits [7:0]: core number within the cluster (Arm ARM, MPIDR_EL1). */
 #define MPIDR_AFF0_MASK 0xff
 
+/*
+ * arm64 kernel image header (64 bytes), as described in the Linux kernel's
+ * Documentation/arch/arm64/booting.rst boot protocol. With it, QEMU and the
+ * Raspberry Pi firmware treat the raw image as a kernel: they load it at
+ * 2 MB-aligned RAM base + text_offset and pass the Device Tree address in x0.
+ */
+#define IMAGE_MAGIC 0x644d5241 /* "ARM\x64" */
+/* flags: little-endian, page size unspecified, placed close to the start of RAM. */
+#define IMAGE_FLAGS 0
+
 	.section .text.boot, "ax"
 	.global _start
 	.type _start, %function
 _start:
+	b	boot_entry		/* code0: first instruction executed */
+	.long	0			/* code1 */
+	.quad	kernel_text_offset	/* offset from the 2 MB-aligned base (linker script) */
+	.quad	kernel_image_size	/* bytes the image occupies, including .bss and stack */
+	.quad	IMAGE_FLAGS
+	.quad	0			/* res2 */
+	.quad	0			/* res3 */
+	.quad	0			/* res4 */
+	.long	IMAGE_MAGIC
+	.long	0			/* res5: no PE/COFF header */
+
+boot_entry:
 	/* Only core 0 boots the kernel for now; SMP comes in a later phase. */
 	mrs	x1, mpidr_el1
 	and	x1, x1, #MPIDR_AFF0_MASK

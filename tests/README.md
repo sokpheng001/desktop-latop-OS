@@ -11,13 +11,17 @@ QEMU and a host C compiler. CI runs the same command.
 
 ## Host unit tests: `lib_test.sh`
 
-Builds `lib/` for the development machine and checks `memset`, `memcpy`, `strlen` and the
-`kprintf` formatter (every conversion, width, padding, 64-bit limits).
+Builds `lib/` for the development machine and checks `memset`, `memcpy`, `strlen`, the
+`kprintf` formatter (every conversion, width, padding, 64-bit limits) and the Device Tree reader
+against `fdt_test.dts` (64-bit cells, several memory nodes and ranges, nested `reg` properties,
+a damaged header).
 
 ## Boot tests: `boot_test.sh`
 
 Each run builds a kernel, boots it in QEMU and checks the serial console. Every run must print
-the banner, the board name, `EL: 1` and the timer line. Self-test kernels are built with
+the banner, the board name, `EL: 1`, the RAM found in the Device Tree and the timer line. Kernels
+boot as raw images, so QEMU passes the Device Tree in x0: its own for `virt`, and the one built
+from `board/rpi4/qemu.dts` for the Pi (QEMU fills in the memory node). Self-test kernels are built with
 `make KERNEL_TEST=<name>` (see `kernel/selftest.c`) into `build/<board>-test-<name>/`.
 
 | Run | What it proves |

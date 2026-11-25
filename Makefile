@@ -82,6 +82,11 @@ DEPS := $(OBJS:.o=.d)
 ELF  := $(BUILD_DIR)/os001.elf
 IMG  := $(BUILD_DIR)/kernel8.img
 
+# Boards QEMU cannot describe on its own ship a Device Tree source for QEMU runs.
+DTC       ?= dtc
+QEMU_DTS  := $(wildcard board/$(BOARD)/qemu.dts)
+QEMU_DTB  := $(if $(QEMU_DTS),$(BUILD_DIR)/qemu.dtb)
+
 # Files checked by format / check-format.
 FMT_FILES := $(shell find arch board kernel drivers lib include tests \
 		-type f \( -name '*.c' -o -name '*.h' \) 2>/dev/null | sort)
@@ -89,10 +94,11 @@ FMT_FILES := $(shell find arch board kernel drivers lib include tests \
 # ---------------------------------------------------------------------------
 # QEMU
 # ---------------------------------------------------------------------------
+# The raw image carries the arm64 image header, so QEMU passes the Device Tree in x0.
 ifeq ($(BOARD),virt)
-QEMU_ARGS := -M virt -cpu cortex-a72 -m 1G -nic none -nographic -kernel $(ELF)
+QEMU_ARGS := -M virt -cpu cortex-a72 -m 1G -nic none -nographic -kernel $(IMG)
 else
-QEMU_ARGS := -M raspi4b -serial stdio -display none -kernel $(IMG)
+QEMU_ARGS := -M raspi4b -serial stdio -display none -kernel $(IMG) -dtb $(QEMU_DTB)
 endif
 
 # ---------------------------------------------------------------------------
@@ -105,8 +111,13 @@ ifeq ($(strip $(SRCS)),)
 all:
 	@echo "No sources for BOARD=$(BOARD) yet; nothing to build."
 else
-all: $(IMG)
+all: $(IMG) $(QEMU_DTB)
 endif
+
+$(BUILD_DIR)/qemu.dtb: $(QEMU_DTS)
+	$(call echo_cmd,DTC,$@)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)$(DTC) -I dts -O dtb -o $@ $<
 
 $(ELF): $(OBJS) $(LDSCRIPTS)
 	$(call echo_cmd,LD,$@)
@@ -163,7 +174,7 @@ help:
 	@echo "OS-001 build"
 	@echo ""
 	@echo "Targets:"
-	@echo "  all           Build build/<board>/os001.elf and kernel8.img (default)"
+	@echo "  all           Build build/<board>/os001.elf, kernel8.img (and qemu.dtb if the board has one)"
 	@echo "  run           Build and boot in QEMU"
 	@echo "  debug         Boot in QEMU halted, waiting for GDB on :1234"
 	@echo "  test          Run every tests/*.sh"
