@@ -13,6 +13,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Planned
+- Phase 2 (v0.2.0): drop from EL2 to EL1, exception vectors, GIC interrupt controller, generic timer tick
+
+## [0.1.0] - 2026-11-25
+
+First boot: OS-001 boots on QEMU `virt` and Raspberry Pi 4 (`raspi4b`) and prints its banner over the PL011 UART.
+
 ### Added
 - Roadmap ([docs/ROADMAP.md](docs/ROADMAP.md)): phases 1-7 broken into small steps
 - Branch workflow: daily work on `dev`, finished and tested phases merged to `main`
@@ -45,11 +52,6 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - QEMU `virt` runs with `-nic none`: no network card (and no option ROM) is needed yet
 - Host unit test builds cleanly with GCC's format checker
 
-### Planned
-- Phase 1: boot code (AArch64 assembly), `kernel_main`, UART output, "Hello from OS-001!" in QEMU
-- Board support: Raspberry Pi 4 (`raspi4b`) and QEMU `virt`
-- Hardware abstraction layer (HAL)
-
 ## [0.0.1] - 2026-11-25
 
 ### Added
@@ -58,5 +60,6 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `README.md`, `AUTHORS`, `.gitignore`
 - This changelog
 
-[Unreleased]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/sokpheng001/desktop-latop-OS/releases/tag/v0.0.1

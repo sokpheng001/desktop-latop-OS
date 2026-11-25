@@ -19,6 +19,19 @@ Our own kernel, written from scratch. Raspberry Pi first, then x86_64 PCs, and V
 - [Contributing](CONTRIBUTING.md): code, build and originality rules
 - [Daily progress](docs/progress/): what was done each working day
 
+## Build and run
+
+Needs `aarch64-elf-gcc` (or `aarch64-linux-gnu-gcc` with `CROSS_COMPILE=aarch64-linux-gnu-`),
+`qemu-system-aarch64` (9.0 or newer for the Raspberry Pi 4 machine) and `clang-format`.
+
+```sh
+make                 # build for QEMU virt (default)
+make run             # boot it in QEMU; quit with Ctrl-A then X
+make BOARD=rpi4 run  # Raspberry Pi 4: build/rpi4/kernel8.img
+make test            # unit tests and QEMU boot tests for every board
+make help            # all targets and options
+```
+
 ## Authors
 
 kwan, oda, sokpheng001 (see [AUTHORS](AUTHORS))
