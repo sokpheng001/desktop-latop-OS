@@ -12,6 +12,7 @@ Our own kernel, written from scratch. Raspberry Pi first, then x86_64 PCs, and V
 - [Hardware](docs/HARDWARE.md): target platforms and requirements
 - [Roadmap](docs/ROADMAP.md): planned work, step by step
 - [Changelog](CHANGELOG.md): history of changes
+- [Research](docs/RESEARCH.md): papers behind the design
 - [Contributing](CONTRIBUTING.md): code, build and originality rules
 - [Daily progress](docs/progress/): what was done each working day
 

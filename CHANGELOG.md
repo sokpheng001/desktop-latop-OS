@@ -18,6 +18,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Contribution rules ([CONTRIBUTING.md](CONTRIBUTING.md)): from-scratch originality policy, author header on every file, C17 code style, industry-standard Makefile conventions, testing and git workflow
 - `.editorconfig` and `.clang-format` shared editor and formatting settings
 - Daily progress reports in `docs/progress/`
+- Research foundations ([docs/RESEARCH.md](docs/RESEARCH.md)): 26 verified papers mapped to OS-001 subsystems and roadmap phases
 
 ### Planned
 - Phase 1: boot code (AArch64 assembly), `kernel_main`, UART output, "Hello from OS-001!" in QEMU
