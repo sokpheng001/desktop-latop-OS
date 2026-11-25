@@ -1,5 +1,6 @@
 <!--
   Project: OS-001
+  Date: 2026-11-25
   Authors: kwan, oda, sokpheng001
 -->
 
@@ -30,6 +31,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 - Working hours for daily progress reports: Monday to Friday, 5 PM to 11:59 PM
+- File header now records the date each file was first written (`Date: YYYY-MM-DD` above `Authors`)
 
 ### Planned
 - Phase 1: boot code (AArch64 assembly), `kernel_main`, UART output, "Hello from OS-001!" in QEMU

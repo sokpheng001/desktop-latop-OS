@@ -1,5 +1,6 @@
 /*
  * Project: OS-001
+ * Date: 2026-11-25
  * Authors: kwan, oda, sokpheng001
  *
  * Common AArch64 kernel memory layout. Each board's linker.ld sets KERNEL_BASE

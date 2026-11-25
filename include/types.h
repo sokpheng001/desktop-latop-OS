@@ -1,5 +1,6 @@
 /*
  * Project: OS-001
+ * Date: 2026-11-25
  * Authors: kwan, oda, sokpheng001
  *
  * Fixed-width integer types and basic definitions for freestanding kernel code.

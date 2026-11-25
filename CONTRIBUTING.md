@@ -1,5 +1,6 @@
 <!--
   Project: OS-001
+  Date: 2026-11-25
   Authors: kwan, oda, sokpheng001
 -->
 
@@ -22,6 +23,7 @@ Every file we write starts with this header, in that file's comment syntax:
 ```c
 /*
  * Project: OS-001
+ * Date: <YYYY-MM-DD, the day the file was first written>
  * Authors: kwan, oda, sokpheng001
  *
  * <one or two lines: what this file does>
@@ -29,6 +31,7 @@ Every file we write starts with this header, in that file's comment syntax:
  */
 ```
 
+- `Date` records when the file was first written (ISO 8601, `YYYY-MM-DD`). It never changes on later edits; git history tracks those.
 - Assembly (`.S`), linker scripts (`.ld`): same `/* ... */` form.
 - Makefile, shell, Python: `#` comments.
 - Markdown: an HTML comment `<!-- ... -->`.

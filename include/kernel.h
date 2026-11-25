@@ -1,5 +1,6 @@
 /*
  * Project: OS-001
+ * Date: 2026-11-25
  * Authors: kwan, oda, sokpheng001
  *
  * Kernel-wide declarations shared by the boot code and the core kernel.
