@@ -23,6 +23,9 @@ void hal_console_putc(char c);
 /* Read one byte from the console without waiting. Returns -1 if none is available. */
 int hal_console_getc(void);
 
+/* Short, stable board identifier, e.g. "qemu-virt" (shown at boot and in logs). */
+const char *hal_board_name(void);
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* OS001_HAL_H */

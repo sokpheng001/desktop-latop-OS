@@ -30,6 +30,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - PL011 UART driver (`drivers/pl011/`): polled 8N1, baud divisor from the reference clock; HAL for `board/virt` (UART at 0x09000000) and `board/rpi4` (UART at 0xFE201000, GPIO 14/15 routed to UART0); `kernel_main` calls `hal_init`
 - `lib/`: `memset`, `memcpy`, `strlen` and `kprintf` (`%s %c %d %u %x %p %%`, `l` modifier, field width and zero padding) with an output sink set by the kernel
 - Host unit tests for `lib/` (`tests/lib_test.sh`), run by `make test`
+- Boot banner: `kernel_main` prints the OS-001 version, board, kernel image range, Device Tree address and "Hello from OS-001!"; kernel console (`kernel/console.c`) and `hal_board_name`
 - `include/kernel.h` and a minimal `kernel/main.c` (`kernel_main` entry point)
 - Vision: OS-001 is both a complete normal OS and a human-AI system ([docs/VISION.md](docs/VISION.md))
 

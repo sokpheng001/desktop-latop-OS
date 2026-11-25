@@ -31,3 +31,8 @@ int hal_console_getc(void)
 {
 	return pl011_getc(&console);
 }
+
+const char *hal_board_name(void)
+{
+	return BOARD_NAME;
+}
