@@ -13,6 +13,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- Version string set to `0.2.0-dev` for Phase 2 work
+
 ### Planned
 - Phase 2 (v0.2.0): drop from EL2 to EL1, exception vectors, GIC interrupt controller, generic timer tick
 
