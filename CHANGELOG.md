@@ -20,12 +20,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Daily progress reports in `docs/progress/`
 - README: project timeline (2024 – present) and copyright line
 - Research foundations ([docs/RESEARCH.md](docs/RESEARCH.md)): 26 verified papers mapped to OS-001 subsystems and roadmap phases
+- Source folder structure (`arch/`, `board/`, `kernel/`, `drivers/`, `lib/`, `include/`, `tests/`), each with a README describing what belongs there
+- `Makefile`: out-of-tree builds in `build/<board>/`, `BOARD`, `CROSS_COMPILE`, `V=1`, `CFLAGS_EXTRA`, `-MMD -MP` header dependencies, `-Werror`, reproducible output (`-ffile-prefix-map`, no build ID), per-board driver selection via `board/<board>/board.mk`; targets `all run debug test format check-format clean distclean help`
 
 ### Planned
 - Phase 1: boot code (AArch64 assembly), `kernel_main`, UART output, "Hello from OS-001!" in QEMU
 - Board support: Raspberry Pi 4 (`raspi4b`) and QEMU `virt`
-- Hardware abstraction layer (HAL) and project folder structure
-- Makefile with `make BOARD=<board> run` and `debug` targets
+- Hardware abstraction layer (HAL)
 
 ## [0.0.1] - 2026-11-25
 

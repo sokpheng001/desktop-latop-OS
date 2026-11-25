@@ -12,7 +12,7 @@ from `dev` into `main` and released with the version shown.
 Coarse items (later phases) are split into small steps before work on them starts.
 
 ## Phase 1 — First boot (v0.1.0)
-- [ ] Folder structure (`arch/`, `board/`, `kernel/`, `drivers/`, `lib/`, `include/`, `tests/`) and Makefile following CONTRIBUTING.md §4: out-of-tree `build/<board>/`, `BOARD`, `CROSS_COMPILE`, `V=1`, `-MMD -MP`, `-Werror`, targets `all run debug test format check-format clean distclean help`
+- [x] Folder structure (`arch/`, `board/`, `kernel/`, `drivers/`, `lib/`, `include/`, `tests/`) and Makefile following CONTRIBUTING.md §4: out-of-tree `build/<board>/`, `BOARD`, `CROSS_COMPILE`, `V=1`, `-MMD -MP`, `-Werror`, targets `all run debug test format check-format clean distclean help`
 - [ ] `include/types.h`, `include/compiler.h`, `include/mmio.h` (fixed-width types, attributes, MMIO helpers)
 - [ ] Linker scripts: `virt` (load at 0x40080000) and `rpi4` (load at 0x80000)
 - [ ] `arch/aarch64/boot.S`: park secondary cores, set up the stack, zero BSS, call `kernel_main`
