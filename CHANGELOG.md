@@ -14,6 +14,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Progress report for 2026-11-26 (`docs/progress/2026-11-26.md`)
 - Kernel threads (`kernel/thread.c`): `thread_create`, `thread_yield`, `thread_exit` with a FIFO run queue; the boot code becomes thread 0 ("main"); each thread gets a 16 KB stack from the heap, freed after it exits. Threads can also give up the CPU early with `thread_yield`
 - AArch64 context switch (`arch/aarch64/context.S`): saves only the AAPCS64 callee-saved registers (x19-x30) on the outgoing thread's stack, so a parked thread is one stack pointer; `arch_irq_save` / `arch_irq_restore`
 - Preemptive round-robin scheduling: each thread gets a slice of 2 timer ticks (20 ms); when it runs out, the switch happens at the end of interrupt handling, after every interrupt is completed, on the interrupted thread's own stack (`thread_tick`, `thread_preempt`)
