@@ -36,7 +36,7 @@ Coarse items (later phases) are split into small steps before work on them start
 - [x] Physical page allocator (4 KB pages)
 - [x] MMU on: identity-mapped page tables for RAM (cached) and devices, caches enabled
 - [x] Kernel mapped with least privilege: code read-only, data never executable, page 0 unmapped
-- [ ] Kernel heap: `kmalloc` / `kfree`
+- [x] Kernel heap: `kmalloc` / `kfree`
 
 ## Phase 4 — Processes and permissions (v0.4.0)
 - [ ] Kernel threads and context switch

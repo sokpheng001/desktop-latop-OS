@@ -9,6 +9,7 @@
 #include "arch.h"
 #include "console.h"
 #include "hal.h"
+#include "heap.h"
 #include "kernel.h"
 #include "lib/kprintf.h"
 #include "mem.h"
@@ -38,6 +39,7 @@ void kernel_main(uptr dtb)
 		kprintf("DTB:    not passed by the loader\n");
 	mem_init(dtb);
 	vm_init();
+	heap_init();
 	kprintf("Hello from OS-001!\n");
 
 	/* Each source is still disabled at the controller until a driver registers it. */

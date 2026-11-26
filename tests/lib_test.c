@@ -4,7 +4,8 @@
  * Authors: kwan, oda, sokpheng001
  *
  * Host unit tests for lib/ (string helpers, the kprintf formatter and the
- * Device Tree reader) and the physical page allocator (kernel/pmm.c). Built and
+ * Device Tree reader), the physical page allocator (kernel/pmm.c) and the kernel
+ * heap (kernel/heap.c). Built and
  * run on the development machine by tests/lib_test.sh, which passes the compiled
  * tests/fdt_test.dts as the first argument.
  */
@@ -12,6 +13,7 @@
 #include "lib/fdt.h"
 #include "lib/kprintf.h"
 #include "lib/string.h"
+#include "heap.h"
 #include "pmm.h"
 
 /* The few host libc/POSIX functions used, declared by hand so no host headers clash with ours. */
@@ -249,11 +251,88 @@ static void test_pmm(void)
 	check(pmm_alloc_pages(71) == 0, "FAIL pmm_alloc_pages larger than free memory");
 }
 
+/* The heap on the same fake RAM: one range of 79 pages (1-79), nothing reserved. */
+static void test_heap(void)
+{
+	const struct pmm_range ram[] = {{pg(1), pg(80) - pg(1)}};
+	static void *objs[PMM_TEST_PAGES * 2];
+
+	check(pmm_init(ram, 1, NULL, 0), "FAIL heap: pmm_init");
+	heap_init();
+	usize free0 = pmm_free_count();
+
+	check(kmalloc(0) == NULL, "FAIL kmalloc(0) is not NULL");
+
+	/* Same-size blocks are distinct, aligned and inside RAM; a freed block is reused first. */
+	void *a = kmalloc(16);
+	void *b = kmalloc(16);
+
+	check(a && b && a != b, "FAIL kmalloc returns distinct blocks");
+	check((uptr)a % HEAP_ALIGN == 0 && (uptr)b % HEAP_ALIGN == 0, "FAIL kmalloc alignment");
+	check((uptr)a >= pg(1) && (uptr)a < pg(80), "FAIL kmalloc block outside RAM");
+	check(heap_page_count() == 1 && heap_live_count() == 2, "FAIL heap counts after 2 small");
+	kfree(a);
+	check(kmalloc(10) == a, "FAIL kmalloc does not reuse a freed block of its class");
+	kfree(a);
+	kfree(b);
+
+	/* Two blocks per page in the 2048 class (2032 usable); 2033 bytes needs a page of its own.
+	 */
+	void *c1 = kmalloc(2032);
+	void *c2 = kmalloc(2032);
+
+	uptr gap = (uptr)c1 > (uptr)c2 ? (uptr)c1 - (uptr)c2 : (uptr)c2 - (uptr)c1;
+
+	check(c1 && c2 && gap == 2048, "FAIL 2048-byte class layout");
+	check(heap_page_count() == 2, "FAIL 2048-byte class uses one page for two blocks");
+	void *big = kmalloc(2033);
+
+	check(big && heap_page_count() == 3, "FAIL kmalloc(2033) takes one whole page");
+	kfree(big);
+	check(heap_page_count() == 2 && pmm_free_count() == free0 - 2,
+	      "FAIL kfree of a page allocation returns the page");
+	kfree(c1);
+	kfree(c2);
+
+	/* kzalloc zeroes memory that held data before. */
+	u8 *d = kmalloc(3 * PMM_PAGE_SIZE);
+
+	for (usize i = 0; d && i < 3 * PMM_PAGE_SIZE; i++)
+		d[i] = 0xaa;
+	kfree(d);
+	u8 *z = kzalloc(3 * PMM_PAGE_SIZE);
+	bool zero = z != NULL;
+
+	for (usize i = 0; z && i < 3 * PMM_PAGE_SIZE; i++)
+		zero = zero && z[i] == 0;
+	check(zero, "FAIL kzalloc returns zeroed memory");
+	kfree(z);
+
+	/* Bad frees are refused and counted, and change nothing. */
+	usize live = heap_live_count();
+
+	kfree(NULL);
+	kfree(a);
+	kfree((u8 *)b + 1);
+	check(heap_bad_frees() == 2 && heap_live_count() == live, "FAIL kfree refuses bad frees");
+
+	/* Exhaustion gives NULL, and freeing everything makes the memory usable again. */
+	usize n = 0;
+
+	while (n < ARRAY_SIZE(objs) && (objs[n] = kmalloc(3000)) != NULL)
+		n++;
+	check(n > 0 && n < ARRAY_SIZE(objs), "FAIL kmalloc returns NULL when memory runs out");
+	for (usize i = 0; i < n; i++)
+		kfree(objs[i]);
+	check(kmalloc(3000) != NULL, "FAIL memory is usable again after kfree");
+}
+
 int main(int argc, char **argv)
 {
 	test_string();
 	test_kprintf();
 	test_pmm();
+	test_heap();
 	if (argc > 1)
 		test_fdt(argv[1]);
 	else

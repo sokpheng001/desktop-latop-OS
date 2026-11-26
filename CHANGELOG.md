@@ -24,6 +24,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - MMU on (`arch/aarch64/mmu.c`, `kernel/vm.c`): 4 KB granule, 39-bit identity map built from the page allocator, RAM as cached normal memory, device registers as uncached Device-nGnRnE and never executable, everything else unmapped; data and instruction caches on. Ranges use the largest block that fits (1 GB, 2 MB, 4 KB), so virt needs 2 table pages and the Pi 3. The banner prints an `MMU:` line
 - Kernel mapped with least privilege: code read-only and executable, constants read-only, data and all other RAM never executable, page 0 unmapped so NULL pointers fault; `SCTLR_EL1.WXN` makes every writable mapping non-executable as a second line of defence. The linker script exports `kernel_rodata_start` and `kernel_data_start`
 - Boot runs `rodata`, `nx` and `null` on both boards: writing a constant, jumping into data and reading address 0 must each be reported with the right fault and address
+- Kernel heap `kernel/heap.c`: `kmalloc`, `kzalloc` and `kfree` with 16-byte alignment. Seven size classes (32 to 2048-byte blocks) carved from pages, after Bonwick's slab allocator (USENIX 1994); larger requests get whole contiguous pages. A header on every block lets `kfree` work without a size and refuse double or foreign frees
+- Heap tests: host unit tests (class layout, reuse, zeroing, refused frees, exhaustion) and `virt-heap` / `rpi4-heap` boot runs (512 objects of every size, twice, with pattern checks and page reuse)
 - `hal_mmio_ranges`: each board lists its device register ranges for the MMU
 - Progress report for 2026-11-25 (`docs/progress/2026-11-25.md`) covering the whole first working day
 

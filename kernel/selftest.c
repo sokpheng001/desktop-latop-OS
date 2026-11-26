@@ -11,6 +11,7 @@
 #include "arch.h"
 #include "compiler.h"
 #include "hal.h"
+#include "heap.h"
 #include "irq.h"
 #include "lib/kprintf.h"
 #include "pmm.h"
@@ -63,6 +64,91 @@ static u32 selftest_code[1] = {0xd65f03c0u};
 #define SELFTEST_TICKS	       50u
 /* Allowed difference between tick time and counter time, in percent. */
 #define SELFTEST_TOLERANCE_PCT 10u
+#endif
+
+#if defined(KERNEL_TEST_HEAP)
+/* Objects per round; sizes cycle through every class and into whole pages. */
+#define SELFTEST_HEAP_OBJS 512u
+#define SELFTEST_HEAP_BIG  (3u * PMM_PAGE_SIZE)
+
+static void *heap_objs[SELFTEST_HEAP_OBJS];
+
+static usize heap_size(usize i)
+{
+	static const usize sizes[] = {1, 8, 16, 17, 48, 100, 200, 500, 1000, 2000, 2032, 5000};
+
+	return sizes[i % (sizeof(sizes) / sizeof(sizes[0]))];
+}
+
+/* Fill object i with a pattern unique to it, or check that the pattern is intact. */
+static bool heap_pattern(usize i, bool check)
+{
+	volatile u8 *p = heap_objs[i];
+
+	for (usize b = 0; b < heap_size(i); b++) {
+		u8 v = (u8)(i * 31u + b);
+
+		if (!check)
+			p[b] = v;
+		else if (p[b] != v)
+			return false;
+	}
+	return true;
+}
+
+/*
+ * Two rounds of allocate, fill, check, free. Overlapping objects would break a
+ * pattern; the second round must reuse the first round's pages; and every page and
+ * object must be accounted for at the end.
+ */
+static void selftest_heap(void)
+{
+	usize free0 = pmm_free_count();
+	usize pages_after_first = 0;
+	bool ok = true;
+
+	for (int round = 0; round < 2 && ok; round++) {
+		for (usize i = 0; i < SELFTEST_HEAP_OBJS && ok; i++) {
+			heap_objs[i] = kmalloc(heap_size(i));
+			ok = heap_objs[i] && (uptr)heap_objs[i] % HEAP_ALIGN == 0;
+			if (ok)
+				heap_pattern(i, false);
+		}
+		for (usize i = 0; i < SELFTEST_HEAP_OBJS && ok; i++)
+			ok = heap_pattern(i, true);
+		ok = ok && heap_live_count() == SELFTEST_HEAP_OBJS;
+		for (usize i = 0; i < SELFTEST_HEAP_OBJS && ok; i++)
+			kfree(heap_objs[i]);
+		ok = ok && heap_live_count() == 0 && heap_bad_frees() == 0;
+		if (round == 0)
+			pages_after_first = heap_page_count();
+	}
+	ok = ok && heap_page_count() == pages_after_first &&
+	     pmm_free_count() == free0 - pages_after_first;
+
+	/* Zeroed memory, a multi-page object, and refused bad frees. */
+	u64 *z = kzalloc(SELFTEST_HEAP_BIG);
+
+	for (usize i = 0; ok && i < SELFTEST_HEAP_BIG / sizeof(u64); i++)
+		ok = z[i] == 0;
+	kfree(z);
+	ok = ok && pmm_free_count() == free0 - pages_after_first;
+
+	void *p = kmalloc(64);
+
+	kfree(p);
+	kfree(p);
+	kfree((u8 *)p + 1);
+	ok = ok && heap_bad_frees() == 2 && kmalloc(0) == NULL;
+
+	if (ok)
+		kprintf("Self-test: heap OK (%u objects twice, %lu pages reused)\n",
+			SELFTEST_HEAP_OBJS, (unsigned long)pages_after_first);
+	else
+		kprintf("Self-test: heap FAILED (live=%lu pages=%lu bad_frees=%lu)\n",
+			(unsigned long)heap_live_count(), (unsigned long)heap_page_count(),
+			(unsigned long)heap_bad_frees());
+}
 #endif
 
 #if defined(KERNEL_TEST_PMM)
@@ -139,6 +225,9 @@ void selftest_run(void)
 {
 #if defined(KERNEL_TEST_PMM)
 	selftest_pmm();
+#endif
+#if defined(KERNEL_TEST_HEAP)
+	selftest_heap();
 #endif
 #if defined(KERNEL_TEST_FAULT)
 	/* Must end in the exception handler's report, never return here. */

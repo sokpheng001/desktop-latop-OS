@@ -14,7 +14,7 @@ QEMU and a host C compiler. CI runs the same command.
 Builds `lib/` and the page allocator for the development machine and checks `memset`, `memcpy`,
 `strlen`, the `kprintf` formatter (every conversion, width, padding, 64-bit limits), the Device
 Tree reader against `fdt_test.dts` (64-bit cells, several memory nodes and ranges, nested `reg`
-properties, `/memreserve/` entries, a damaged header) and `kernel/pmm.c` on fake RAM (two ranges
+properties, `/memreserve/` entries, a damaged header), `kernel/pmm.c` and `kernel/heap.c` on fake RAM (two ranges
 with a gap, unaligned and out-of-range reservations, every page handed out exactly once,
 contiguous runs, refused bad frees).
 
@@ -37,6 +37,7 @@ from `board/rpi4/qemu.dts` for the Pi (QEMU fills in the memory node). Self-test
 | `virt-rodata`, `rpi4-rodata` | Writing a kernel constant is a permission fault, with FAR = that address |
 | `virt-nx`, `rpi4-nx` | Jumping into kernel data is an instruction abort (permission fault): data never runs as code |
 | `virt-null`, `rpi4-null` | Reading address 0 is a translation fault (on the Pi, page 0 is RAM and deliberately unmapped) |
+| `virt-heap`, `rpi4-heap` | 512 objects of every size class and multi-page sizes never overlap, are reused after `kfree`, and bad frees are refused |
 | `virt-pmm`, `rpi4-pmm` | Every free page is handed out once, written and returned, none inside the kernel; a double or misaligned free is refused; a 16-page run works |
 
 Run a subset with `RUNS="virt-irq rpi4-irq" sh tests/boot_test.sh`. Console logs are kept in
