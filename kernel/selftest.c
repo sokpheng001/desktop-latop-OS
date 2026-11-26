@@ -48,6 +48,16 @@ static void selftest_irq_handler(u32 irq, void *ctx)
 #define SELFTEST_UNMAPPED_ADDR 0x7f00000000ul
 #endif
 
+#if defined(KERNEL_TEST_RODATA)
+/* A kernel constant: mapped read-only, so writing it must fault. */
+static const u32 selftest_const = 1;
+#endif
+
+#if defined(KERNEL_TEST_NX)
+/* A RET instruction (A64 encoding 0xd65f03c0) placed in writable data, never executable. */
+static u32 selftest_code[1] = {0xd65f03c0u};
+#endif
+
 #if defined(KERNEL_TEST_TIMER)
 /* Ticks to wait for: half a second at 100 Hz. */
 #define SELFTEST_TICKS	       50u
@@ -139,9 +149,36 @@ void selftest_run(void)
 	/* Must end in a data abort report whose FAR is this address. */
 	volatile u32 *unmapped = (volatile u32 *)SELFTEST_UNMAPPED_ADDR;
 
-	kprintf("Self-test: load from unmapped address %p\n", (void *)unmapped);
+	kprintf("Self-test: load from unmapped memory at %p\n", (void *)unmapped);
 	(void)*unmapped;
 	kprintf("Self-test: abort FAILED (the load did not fault)\n");
+#endif
+#if defined(KERNEL_TEST_RODATA)
+	/* Must end in a data abort, permission fault, whose FAR is this address. */
+	uptr ro = (uptr)&selftest_const;
+
+	HIDE_VALUE(ro);
+	kprintf("Self-test: write to read-only data at %p\n", (void *)ro);
+	*(volatile u32 *)ro = 2;
+	kprintf("Self-test: rodata FAILED (the write did not fault)\n");
+#endif
+#if defined(KERNEL_TEST_NX)
+	/* Must end in an instruction abort, permission fault, whose FAR is this address. */
+	uptr code = (uptr)selftest_code;
+
+	HIDE_VALUE(code);
+	kprintf("Self-test: jump to data at %p\n", (void *)code);
+	((void (*)(void))code)();
+	kprintf("Self-test: nx FAILED (data ran as code)\n");
+#endif
+#if defined(KERNEL_TEST_NULL)
+	/* Page 0 is unmapped: must end in a translation fault whose FAR is 0. */
+	uptr null = 0;
+
+	HIDE_VALUE(null);
+	kprintf("Self-test: load from NULL at %p\n", (void *)null);
+	(void)*(volatile u32 *)null;
+	kprintf("Self-test: null FAILED (the load did not fault)\n");
 #endif
 #if defined(KERNEL_TEST_IRQ)
 	/* Exercises the GIC, the IRQ vector, dispatch and the return to interrupted code. */

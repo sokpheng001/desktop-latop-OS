@@ -17,7 +17,9 @@
 
 /* Memory types the MMU can map a range as. */
 enum arch_mem_type {
-	ARCH_MEM_NORMAL, /* RAM: cached, may be reordered */
+	ARCH_MEM_NORMAL, /* RAM: cached, read/write, never executed */
+	ARCH_MEM_TEXT,	 /* kernel code: cached, read-only, executable */
+	ARCH_MEM_RODATA, /* kernel constants: cached, read-only, never executed */
 	ARCH_MEM_DEVICE, /* device registers: uncached, strictly ordered, never executed */
 };
 
@@ -29,9 +31,10 @@ struct arch_mem_map {
 
 /*
  * Build page tables that map each range at its own physical address (identity map),
- * then turn on the MMU and caches. Nothing else is mapped, so any other access
- * faults. Returns the number of 4 KB table pages used, or -1 (MMU left off) if a
- * range is outside the virtual address space or out of memory for tables.
+ * then turn on the MMU and caches. Ranges must not overlap. Nothing else is mapped,
+ * so any other access faults; no range is both writable and executable. Returns the number of 4 KB
+ * table pages used, or -1 (MMU left off) if a range is outside the virtual address space or out of
+ * memory for tables.
  */
 int arch_mmu_init(const struct arch_mem_map *maps, int n);
 

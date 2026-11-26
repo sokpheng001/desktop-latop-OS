@@ -13,6 +13,10 @@
 #          be reported by the exception handler
 #   abort  self-test kernel (make KERNEL_TEST=abort): a load from an unmapped address
 #          must be reported as a data abort (translation fault) with FAR = the address
+#   rodata self-test kernel: a write to a kernel constant must be a permission fault
+#   nx     self-test kernel: a jump into kernel data must be an instruction abort
+#          (permission fault): data is never executable
+#   null   self-test kernel: a load from address 0 must be a translation fault
 #   irq    self-test kernel (make KERNEL_TEST=irq): a software interrupt must go
 #          through the interrupt controller, the IRQ vector and dispatch, and return;
 #          an interrupt without a handler must be reported once and disabled
@@ -25,7 +29,7 @@ set -u
 
 QEMU=${QEMU:-qemu-system-aarch64}
 BOOT_TIMEOUT=${BOOT_TIMEOUT:-10}
-RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-abort rpi4-abort virt-irq rpi4-irq virt-timer rpi4-timer virt-pmm rpi4-pmm"}
+RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-abort rpi4-abort virt-irq rpi4-irq virt-timer rpi4-timer virt-pmm rpi4-pmm virt-rodata rpi4-rodata virt-nx rpi4-nx virt-null rpi4-null"}
 LOG_DIR=build/test
 MAKE=${MAKE:-make}
 
@@ -104,6 +108,30 @@ for run in $RUNS; do
         build_dir="build/$board-test-timer"
         expect=$(printf '%s\n' "$expect" "Self-test: timer OK")
         ;;
+    rodata)
+        make_args="$make_args KERNEL_TEST=rodata"
+        build_dir="build/$board-test-rodata"
+        expect=$(printf '%s\n' "$expect" \
+            "EC=0x25 Data abort from current EL" \
+            "FSC:      0x0f Permission fault, level 3" \
+            "*** System halted.")
+        ;;
+    nx)
+        make_args="$make_args KERNEL_TEST=nx"
+        build_dir="build/$board-test-nx"
+        expect=$(printf '%s\n' "$expect" \
+            "EC=0x21 Instruction abort from current EL" \
+            "FSC:      0x0f Permission fault, level 3" \
+            "*** System halted.")
+        ;;
+    null)
+        make_args="$make_args KERNEL_TEST=null"
+        build_dir="build/$board-test-null"
+        expect=$(printf '%s\n' "$expect" \
+            "EC=0x25 Data abort from current EL" \
+            "Translation fault" \
+            "*** System halted.")
+        ;;
     pmm)
         make_args="$make_args KERNEL_TEST=pmm"
         build_dir="build/$board-test-pmm"
@@ -154,11 +182,12 @@ for run in $RUNS; do
     missing=$(printf '%s\n' "$expect" | while IFS= read -r line; do
         grep -qF -- "$line" "$log" || echo "$line"
     done)
-    # The abort report must name the exact address the self-test loaded from.
-    if [ "$variant" = abort ]; then
-        addr=$(sed -n 's/.*load from unmapped address \(0x[0-9a-f]*\).*/\1/p' "$log" | head -n 1)
+    # A fault report must name the exact address the self-test touched.
+    case "$variant" in abort | rodata | nx | null) check_far=1 ;; *) check_far= ;; esac
+    if [ -n "$check_far" ]; then
+        addr=$(tr -d '\r' < "$log" | sed -n 's/^Self-test: .* at \(0x[0-9a-f]*\)$/\1/p' | head -n 1)
         if [ -z "$addr" ] || ! grep -qF "FAR_EL1:  $addr" "$log"; then
-            missing=$(printf '%s\n' "$missing" "FAR_EL1 equal to the unmapped address")
+            missing=$(printf '%s\n' "$missing" "FAR_EL1 equal to the address the self-test touched")
             missing=${missing#"${missing%%[![:space:]]*}"}
         fi
     fi

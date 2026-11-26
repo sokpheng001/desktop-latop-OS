@@ -32,16 +32,31 @@
 #define DESC_BLOCK	(0ul << 1)
 #define DESC_ATTRIDX(i) ((u64)(i) << 2)
 #define DESC_AP_EL1_RW	(0ul << 6) /* EL1 read/write, EL0 no access */
+#define DESC_AP_EL1_RO	(2ul << 6) /* EL1 read-only, EL0 no access */
 #define DESC_SH_INNER	(3ul << 8)
 #define DESC_AF		(1ul << 10) /* access flag set up front, so no access flag faults */
 #define DESC_PXN	(1ul << 53) /* never executed at EL1 */
 #define DESC_UXN	(1ul << 54) /* never executed at EL0 */
 #define DESC_ADDR_MASK	0x0000fffffffff000ul /* output address bits [47:12] */
 
-#define ATTRS_NORMAL                                                                               \
-	(DESC_ATTRIDX(MAIR_IDX_NORMAL) | DESC_AP_EL1_RW | DESC_SH_INNER | DESC_AF | DESC_UXN)
-#define ATTRS_DEVICE                                                                               \
-	(DESC_ATTRIDX(MAIR_IDX_DEVICE) | DESC_AP_EL1_RW | DESC_AF | DESC_PXN | DESC_UXN)
+/* Cached memory; EL0 never executes kernel memory. */
+#define ATTRS_RAM (DESC_ATTRIDX(MAIR_IDX_NORMAL) | DESC_SH_INNER | DESC_AF | DESC_UXN)
+
+static u64 type_attrs(enum arch_mem_type type)
+{
+	switch (type) {
+	case ARCH_MEM_TEXT:
+		return ATTRS_RAM | DESC_AP_EL1_RO;
+	case ARCH_MEM_RODATA:
+		return ATTRS_RAM | DESC_AP_EL1_RO | DESC_PXN;
+	case ARCH_MEM_DEVICE:
+		return DESC_ATTRIDX(MAIR_IDX_DEVICE) | DESC_AP_EL1_RW | DESC_AF | DESC_PXN |
+		       DESC_UXN;
+	case ARCH_MEM_NORMAL:
+	default:
+		return ATTRS_RAM | DESC_AP_EL1_RW | DESC_PXN;
+	}
+}
 
 static u64 *root;
 static int table_pages;
@@ -151,9 +166,7 @@ int arch_mmu_init(const struct arch_mem_map *maps, int n)
 		return -1;
 
 	for (int i = 0; i < n; i++) {
-		u64 attrs = maps[i].type == ARCH_MEM_DEVICE ? ATTRS_DEVICE : ATTRS_NORMAL;
-
-		if (!map_range(maps[i].base, maps[i].size, attrs))
+		if (!map_range(maps[i].base, maps[i].size, type_attrs(maps[i].type)))
 			return -1;
 	}
 
@@ -190,7 +203,7 @@ int arch_mmu_init(const struct arch_mem_map *maps, int n)
 	u64 sctlr;
 
 	__asm__ volatile("mrs %0, sctlr_el1" : "=r"(sctlr));
-	sctlr |= SCTLR_EL1_M | SCTLR_EL1_C | SCTLR_EL1_I;
+	sctlr |= SCTLR_EL1_M | SCTLR_EL1_C | SCTLR_EL1_I | SCTLR_EL1_WXN;
 	__asm__ volatile("msr sctlr_el1, %0\n"
 			 "isb\n" ::"r"(sctlr)
 			 : "memory");

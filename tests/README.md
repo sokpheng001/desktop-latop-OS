@@ -34,6 +34,9 @@ from `board/rpi4/qemu.dts` for the Pi (QEMU fills in the memory node). Self-test
 | `virt-abort`, `rpi4-abort` | With the MMU on, a load from an unmapped address is reported as a data abort, level 1 translation fault, with FAR = that address |
 | `virt-irq`, `rpi4-irq` | A software interrupt goes through the GIC, IRQ vector and dispatch and returns; an interrupt with no handler is reported once and disabled |
 | `virt-timer`, `rpi4-timer` | 50 timer ticks take 500 ms (within 10%) by the hardware counter |
+| `virt-rodata`, `rpi4-rodata` | Writing a kernel constant is a permission fault, with FAR = that address |
+| `virt-nx`, `rpi4-nx` | Jumping into kernel data is an instruction abort (permission fault): data never runs as code |
+| `virt-null`, `rpi4-null` | Reading address 0 is a translation fault (on the Pi, page 0 is RAM and deliberately unmapped) |
 | `virt-pmm`, `rpi4-pmm` | Every free page is handed out once, written and returned, none inside the kernel; a double or misaligned free is refused; a 16-page run works |
 
 Run a subset with `RUNS="virt-irq rpi4-irq" sh tests/boot_test.sh`. Console logs are kept in

@@ -42,9 +42,11 @@
 
 /* SCTLR_EL1 enable bits: M (bit 0) stage 1 MMU, C (bit 2) data cache, I (bit 12) instruction cache.
  */
-#define SCTLR_EL1_M (UL(1) << 0)
-#define SCTLR_EL1_C (UL(1) << 2)
-#define SCTLR_EL1_I (UL(1) << 12)
+#define SCTLR_EL1_M   (UL(1) << 0)
+#define SCTLR_EL1_C   (UL(1) << 2)
+#define SCTLR_EL1_I   (UL(1) << 12)
+/* SCTLR_EL1.WXN (bit 19): every writable mapping is also treated as never-executable. */
+#define SCTLR_EL1_WXN (UL(1) << 19)
 
 /*
  * MAIR_EL1 attribute encodings (D19.2, MAIR_EL1), one byte per index:

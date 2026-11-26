@@ -37,11 +37,13 @@ SECTIONS
 	} :text
 
 	. = ALIGN(PAGE_SIZE);
+	kernel_rodata_start = .;
 	.rodata : {
 		*(.rodata .rodata.*)
 	} :rodata
 
 	. = ALIGN(PAGE_SIZE);
+	kernel_data_start = .;
 	.data : {
 		*(.data .data.*)
 	} :data

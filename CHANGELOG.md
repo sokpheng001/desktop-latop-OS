@@ -22,6 +22,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `fdt_reserved_regions`: reads the Device Tree memory reservation block (Devicetree Specification v0.4, section 5.3)
 - Page allocator tests: host unit tests on fake RAM with two ranges, a gap and unaligned reserved ranges; `virt-pmm` and `rpi4-pmm` boot runs take every free page, write it and return it
 - MMU on (`arch/aarch64/mmu.c`, `kernel/vm.c`): 4 KB granule, 39-bit identity map built from the page allocator, RAM as cached normal memory, device registers as uncached Device-nGnRnE and never executable, everything else unmapped; data and instruction caches on. Ranges use the largest block that fits (1 GB, 2 MB, 4 KB), so virt needs 2 table pages and the Pi 3. The banner prints an `MMU:` line
+- Kernel mapped with least privilege: code read-only and executable, constants read-only, data and all other RAM never executable, page 0 unmapped so NULL pointers fault; `SCTLR_EL1.WXN` makes every writable mapping non-executable as a second line of defence. The linker script exports `kernel_rodata_start` and `kernel_data_start`
+- Boot runs `rodata`, `nx` and `null` on both boards: writing a constant, jumping into data and reading address 0 must each be reported with the right fault and address
 - `hal_mmio_ranges`: each board lists its device register ranges for the MMU
 - Progress report for 2026-11-25 (`docs/progress/2026-11-25.md`) covering the whole first working day
 
