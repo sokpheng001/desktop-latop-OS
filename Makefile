@@ -52,7 +52,8 @@ CFLAGS   := -std=c17 -ffreestanding -fno-builtin -fno-stack-protector -fno-pie \
 	    -ffile-prefix-map=$(CURDIR)=. \
 	    -Iinclude -Iboard/$(BOARD) \
 	    -MMD -MP $(CFLAGS_EXTRA)
-ASFLAGS  := $(CFLAGS) -D__ASSEMBLY__
+# Recursive (=) so assembly also sees flags added below, such as -DKERNEL_TEST_<name>.
+ASFLAGS   = $(CFLAGS) -D__ASSEMBLY__
 LDFLAGS  := -Wl,-L,arch/$(ARCH) -nostdlib -static -no-pie -Wl,--build-id=none -Wl,--fatal-warnings -Wl,-z,noexecstack
 LDLIBS   := -lgcc
 

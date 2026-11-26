@@ -28,6 +28,9 @@
 #          in order, keep their registers across switches, and be freed on exit
 #   sched  self-test kernel (make KERNEL_TEST=sched): three threads that never yield
 #          must all get regular turns from the timer, then stop and be freed
+#   user   self-test kernel (make KERNEL_TEST=user): programs run in user mode and use
+#          system calls; bad pointers and unknown calls are refused; programs that
+#          write their own code or read kernel memory are killed, the kernel lives on
 #   pmm    self-test kernel (make KERNEL_TEST=pmm): every free page must be handed out
 #          once, written, and returned; double and misaligned frees are refused
 
@@ -35,7 +38,7 @@ set -u
 
 QEMU=${QEMU:-qemu-system-aarch64}
 BOOT_TIMEOUT=${BOOT_TIMEOUT:-10}
-RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-abort rpi4-abort virt-irq rpi4-irq virt-timer rpi4-timer virt-pmm rpi4-pmm virt-rodata rpi4-rodata virt-nx rpi4-nx virt-null rpi4-null virt-heap rpi4-heap virt-thread rpi4-thread virt-sched rpi4-sched"}
+RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-abort rpi4-abort virt-irq rpi4-irq virt-timer rpi4-timer virt-pmm rpi4-pmm virt-rodata rpi4-rodata virt-nx rpi4-nx virt-null rpi4-null virt-heap rpi4-heap virt-thread rpi4-thread virt-sched rpi4-sched virt-user rpi4-user"}
 LOG_DIR=build/test
 MAKE=${MAKE:-make}
 
@@ -147,6 +150,16 @@ for run in $RUNS; do
         make_args="$make_args KERNEL_TEST=sched"
         build_dir="build/$board-test-sched"
         expect=$(printf '%s\n' "$expect" "Self-test: preemptive scheduler OK")
+        ;;
+    user)
+        make_args="$make_args KERNEL_TEST=user"
+        build_dir="build/$board-test-user"
+        expect=$(printf '%s\n' "$expect" \
+            "[user] hello from EL0" "[user] bad pointer refused" \
+            "[user] unknown call refused" "[user] stack works" \
+            "(bad) killed: Permission fault, level 3" \
+            "(peek) killed: Permission fault, level 3" \
+            "Self-test: user mode OK")
         ;;
     heap)
         make_args="$make_args KERNEL_TEST=heap"

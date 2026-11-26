@@ -33,6 +33,8 @@
 #define DESC_ATTRIDX(i) ((u64)(i) << 2)
 #define DESC_AP_EL1_RW	(0ul << 6) /* EL1 read/write, EL0 no access */
 #define DESC_AP_EL1_RO	(2ul << 6) /* EL1 read-only, EL0 no access */
+#define DESC_AP_ALL_RW	(1ul << 6) /* EL1 and EL0 read/write */
+#define DESC_AP_ALL_RO	(3ul << 6) /* EL1 and EL0 read-only */
 #define DESC_SH_INNER	(3ul << 8)
 #define DESC_AF		(1ul << 10) /* access flag set up front, so no access flag faults */
 #define DESC_PXN	(1ul << 53) /* never executed at EL1 */
@@ -78,8 +80,8 @@ static u64 *new_table(void)
 	return t;
 }
 
-/* Map one block or page for va (== pa) at the given level, creating tables on the way. */
-static bool map_one(u64 va, int level, u64 attrs)
+/* Map one block or page at va to pa at the given level, creating tables on the way. */
+static bool map_one(u64 va, u64 pa, int level, u64 attrs)
 {
 	u64 *table = root;
 
@@ -102,9 +104,24 @@ static bool map_one(u64 va, int level, u64 attrs)
 
 	if (*entry & DESC_VALID)
 		return false;
-	*entry = (va & DESC_ADDR_MASK) | attrs | (level == LEVEL_LAST ? DESC_TABLE : DESC_BLOCK) |
+	*entry = (pa & DESC_ADDR_MASK) | attrs | (level == LEVEL_LAST ? DESC_TABLE : DESC_BLOCK) |
 		 DESC_VALID;
 	return true;
+}
+
+/* The level 3 entry for va, or NULL if no level 3 table covers it. */
+static u64 *walk_l3(u64 va)
+{
+	u64 *table = root;
+
+	for (int l = LEVEL_FIRST; table && l < LEVEL_LAST; l++) {
+		u64 e = table[(va >> level_shift(l)) % ENTRIES];
+
+		if ((e & (DESC_VALID | DESC_TABLE)) != (DESC_VALID | DESC_TABLE))
+			return NULL;
+		table = (u64 *)(uptr)(e & DESC_ADDR_MASK);
+	}
+	return table ? &table[(va >> L3_SHIFT) % ENTRIES] : NULL;
 }
 
 static bool map_range(u64 base, u64 size, u64 attrs)
@@ -127,7 +144,7 @@ static bool map_range(u64 base, u64 size, u64 attrs)
 				break;
 			level++;
 		}
-		if (!map_one(va, level, attrs))
+		if (!map_one(va, va, level, attrs))
 			return false;
 		va += 1ul << level_shift(level);
 	}
@@ -208,6 +225,57 @@ int arch_mmu_init(const struct arch_mem_map *maps, int n)
 			 "isb\n" ::"r"(sctlr)
 			 : "memory");
 	return table_pages;
+}
+
+bool arch_mmu_map_user(u64 va, u64 pa, enum arch_user_perm perm)
+{
+	u64 attrs = ATTRS_RAM | DESC_PXN;
+
+	if (perm == ARCH_USER_CODE)
+		attrs = (attrs & ~DESC_UXN) | DESC_AP_ALL_RO;
+	else
+		attrs |= DESC_AP_ALL_RW;
+	if (!root || (va | pa) & ((1ul << L3_SHIFT) - 1) || va >= (1ul << VA_BITS))
+		return false;
+	if (!map_one(va, pa, LEVEL_LAST, attrs))
+		return false;
+	/* The new entry must be visible to the table walker before it is used. */
+	__asm__ volatile("dsb ishst\n"
+			 "isb" ::
+			     : "memory");
+	return true;
+}
+
+void arch_mmu_unmap_user(u64 va)
+{
+	u64 *entry = walk_l3(va);
+
+	if (!entry)
+		return;
+	*entry = 0;
+	/* Remove any cached translation of va (all ASIDs), then wait for it to finish. */
+	__asm__ volatile("dsb ishst\n"
+			 "tlbi vaae1, %0\n"
+			 "dsb ish\n"
+			 "isb" ::"r"(va >> L3_SHIFT)
+			 : "memory");
+}
+
+void arch_sync_icache(uptr addr, usize len)
+{
+	u64 ctr;
+
+	__asm__ volatile("mrs %0, ctr_el0" : "=r"(ctr));
+	uptr line = 4ul << ((ctr >> CTR_DMINLINE_SHIFT) & CTR_DMINLINE_MASK);
+
+	/* Push the new code to the point of unification, then drop stale instructions. */
+	for (uptr a = addr & ~(line - 1); a < addr + len; a += line)
+		__asm__ volatile("dc cvau, %0" ::"r"(a) : "memory");
+	__asm__ volatile("dsb ish\n"
+			 "ic iallu\n"
+			 "dsb ish\n"
+			 "isb" ::
+			     : "memory");
 }
 
 unsigned int arch_mmu_va_bits(void)

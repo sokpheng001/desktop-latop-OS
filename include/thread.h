@@ -37,6 +37,7 @@ struct thread {
 	void *arg;
 	void *stack;	     /* NULL for the boot thread, which keeps the boot stack */
 	u64 runs;	     /* times this thread has been switched to */
+	void *user;	     /* struct user_proc for a user program, NULL for kernel threads */
 	struct thread *next; /* run queue or dead list link */
 };
 

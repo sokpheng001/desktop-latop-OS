@@ -18,6 +18,7 @@
 #include "selftest.h"
 #include "thread.h"
 #include "time.h"
+#include "user.h"
 
 #if defined(KERNEL_TEST_IRQ)
 /* Software-generated interrupts used by the test; any of 0-15 would do. */
@@ -121,6 +122,73 @@ static void selftest_thread(void)
 	else
 		kprintf("Self-test: threads FAILED (order %s, bad=%u, alive=%lu)\n", thread_log,
 			thread_bad, (unsigned long)thread_count());
+}
+#endif
+
+#if defined(KERNEL_TEST_USER)
+/* User programs from arch/aarch64/user_selftest.S. */
+extern const char user_hello_start[], user_hello_end[];
+extern const char user_bad_start[], user_bad_end[];
+extern const char user_peek_start[], user_peek_end[];
+extern const char user_peek_addr_offset[]; /* an offset, not an address */
+extern char kernel_start[];
+
+#define SELFTEST_USER_EXIT 7
+
+/* Run the three programs to the end; true if each ended the way it must. */
+static bool user_round(void)
+{
+	/* The peek program reads the u64 at its offset as the address to load from. */
+	usize peek_size = (usize)(user_peek_end - user_peek_start);
+	u8 *peek = kmalloc(peek_size);
+
+	if (!peek)
+		return false;
+	for (usize i = 0; i < peek_size; i++)
+		peek[i] = (u8)user_peek_start[i];
+	*(u64 *)(peek + (uptr)user_peek_addr_offset) = (u64)(uptr)kernel_start;
+
+	struct user_proc *hello =
+	    user_spawn("hello", user_hello_start, (usize)(user_hello_end - user_hello_start));
+	struct user_proc *bad =
+	    user_spawn("bad", user_bad_start, (usize)(user_bad_end - user_bad_start));
+	struct user_proc *snoop = user_spawn("peek", peek, peek_size);
+	bool ok = hello && bad && snoop;
+
+	for (u32 spins = 0; ok && thread_count() > 1 && spins < 1000; spins++)
+		thread_yield();
+	ok = ok && thread_count() == 1 && hello->exited && hello->exit_code == SELFTEST_USER_EXIT &&
+	     bad->exited && bad->exit_code == USER_EXIT_KILLED && snoop->exited &&
+	     snoop->exit_code == USER_EXIT_KILLED;
+	if (hello)
+		user_release(hello);
+	if (bad)
+		user_release(bad);
+	if (snoop)
+		user_release(snoop);
+	kfree(peek);
+	return ok;
+}
+
+/*
+ * Two rounds: the first also creates the page tables for the user windows, which
+ * stay; the second must then leave memory exactly as it found it.
+ */
+static void selftest_user(void)
+{
+	usize live0 = heap_live_count();
+	bool ok = user_round();
+	usize free1 = pmm_free_count();
+
+	ok = ok && user_round();
+	ok = ok && pmm_free_count() == free1 && heap_live_count() == live0;
+	if (ok)
+		kprintf("Self-test: user mode OK (exit code %d, two programs killed, no leaks)\n",
+			SELFTEST_USER_EXIT);
+	else
+		kprintf("Self-test: user mode FAILED (free %lu -> %lu, alive=%lu)\n",
+			(unsigned long)free1, (unsigned long)pmm_free_count(),
+			(unsigned long)thread_count());
 }
 #endif
 
@@ -349,6 +417,9 @@ void selftest_run(void)
 #endif
 #if defined(KERNEL_TEST_SCHED)
 	selftest_sched();
+#endif
+#if defined(KERNEL_TEST_USER)
+	selftest_user();
 #endif
 #if defined(KERNEL_TEST_FAULT)
 	/* Must end in the exception handler's report, never return here. */

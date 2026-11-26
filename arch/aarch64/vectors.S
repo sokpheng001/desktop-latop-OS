@@ -5,7 +5,8 @@
  *
  * EL1 exception vector table. Every entry saves the interrupted state into an
  * exc_frame on the stack, calls arch_exception_handler, then restores it and
- * returns with eret (so later IRQ handling can reuse this path).
+ * returns with eret. The frame lives on the interrupted thread's kernel stack, so
+ * a thread switch inside the handler keeps it until that thread returns.
  */
 
 #include "arch/aarch64/exception.h"
@@ -62,7 +63,8 @@ exc_common:
 	mrs	x3, esr_el1
 	stp	x2, x3, [sp, #EXC_FRAME_SPSR]
 	mrs	x2, far_el1
-	str	x2, [sp, #EXC_FRAME_FAR]
+	mrs	x3, sp_el0
+	stp	x2, x3, [sp, #EXC_FRAME_FAR]
 
 	mov	x0, sp
 	bl	arch_exception_handler
@@ -72,6 +74,9 @@ exc_common:
 	ldr	x3, [sp, #EXC_FRAME_SPSR]
 	msr	elr_el1, x2
 	msr	spsr_el1, x3
+	/* Each thread's user stack pointer travels in its frame across thread switches. */
+	ldr	x2, [sp, #EXC_FRAME_SP0]
+	msr	sp_el0, x2
 	ldp	x0, x1, [sp, #0]
 	ldp	x2, x3, [sp, #16]
 	ldp	x4, x5, [sp, #32]

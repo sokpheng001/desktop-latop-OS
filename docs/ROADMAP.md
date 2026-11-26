@@ -41,7 +41,8 @@ Coarse items (later phases) are split into small steps before work on them start
 ## Phase 4 — Processes and permissions (v0.4.0)
 - [x] Kernel threads and context switch
 - [x] Round-robin scheduler driven by the timer
-- [ ] User mode (EL0) and system calls
+- [x] User mode (EL0) and system calls: programs in their own pages, `write` / `yield` / `exit`, a faulting program is killed, not the kernel
+- [ ] Per-process address spaces: each process gets its own page tables
 - [ ] Per-process permission table checked by the kernel (privacy pillar)
 - [ ] Message-passing IPC between processes
 

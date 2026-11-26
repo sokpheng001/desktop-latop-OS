@@ -18,10 +18,17 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - AArch64 context switch (`arch/aarch64/context.S`): saves only the AAPCS64 callee-saved registers (x19-x30) on the outgoing thread's stack, so a parked thread is one stack pointer; `arch_irq_save` / `arch_irq_restore`
 - Preemptive round-robin scheduling: each thread gets a slice of 2 timer ticks (20 ms); when it runs out, the switch happens at the end of interrupt handling, after every interrupt is completed, on the interrupted thread's own stack (`thread_tick`, `thread_preempt`)
 - `virt-sched` / `rpi4-sched` boot runs: three threads that never yield must each get regular turns from the timer, then stop and be freed
+- User mode (`kernel/user.c`): `user_spawn` copies a position-independent program into fresh pages mapped at a user address (read and execute for the program, never executed by the kernel), gives it a stack page and runs it at EL0 in its own thread. Each program has a 2 MB window of user addresses above 256 GB until per-process page tables arrive
+- System calls through `svc` (`include/syscall.h`): `write`, `exit`, `yield`; every pointer is checked against the caller's own pages (`-EFAULT`), unknown numbers return `-ENOSYS`. A fault in a user program kills only that program and frees its pages; interrupts and preemption work while user code runs (each thread's `SP_EL0` travels in its exception frame)
+- `arch_mmu_map_user`, `arch_mmu_unmap_user` (with TLB invalidation), `arch_sync_icache`, `arch_enter_user`; `console_write`
+- `virt-user` / `rpi4-user` boot runs: a program says hello, yields, has a bad pointer and an unknown call refused and exits with code 7; programs that write their own code or read kernel memory are killed; two rounds leave no pages or heap memory behind
 - `virt-thread` / `rpi4-thread` boot runs: three threads must run in turn (ABCABCABC), keep their registers across switches and be freed on exit
 
 ### Changed
 - Version string set to `0.4.0-dev` for Phase 4 work
+
+### Fixed
+- Assembly files now see `-DKERNEL_TEST_<name>` like C files (`ASFLAGS` follows `CFLAGS`)
 
 ### Planned
 - Phase 4 (v0.4.0): kernel threads and context switch, round-robin scheduler, user mode and system calls, per-process permissions, message-passing IPC

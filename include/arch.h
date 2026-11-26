@@ -48,6 +48,27 @@ int arch_mmu_init(const struct arch_mem_map *maps, int n);
 uptr arch_context_init(uptr stack_top, void (*start)(void *), void *arg);
 void arch_context_switch(uptr *save_sp, uptr new_sp);
 
+/* User (EL0) page permissions. The kernel never executes user pages. */
+enum arch_user_perm {
+	ARCH_USER_CODE, /* user: read and execute; kernel: read */
+	ARCH_USER_DATA, /* user and kernel: read and write; never executed */
+};
+
+/* Map one 4 KB page of physical memory at user address va (both page-aligned). */
+bool arch_mmu_map_user(u64 va, u64 pa, enum arch_user_perm perm);
+
+/* Remove the user mapping at va and flush it from the TLB. */
+void arch_mmu_unmap_user(u64 va);
+
+/* Make len bytes of code just written at kernel address addr safe to execute. */
+void arch_sync_icache(uptr addr, usize len);
+
+/*
+ * Leave the kernel: continue at entry in user mode (EL0) on the user stack sp, with
+ * interrupts enabled. The thread comes back into the kernel only through exceptions.
+ */
+void arch_enter_user(uptr entry, uptr sp) ATTR_NORETURN;
+
 /* Virtual address bits the MMU translates (the size of the address space). */
 unsigned int arch_mmu_va_bits(void);
 

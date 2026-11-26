@@ -11,6 +11,7 @@
 #include "arch/aarch64/exception.h"
 #include "irq.h"
 #include "lib/kprintf.h"
+#include "user.h"
 
 /* ESR_ELx fields (Arm ARM DDI 0487, ESR_EL1): exception class [31:26], ISS [24:0]. */
 #define ESR_EC_SHIFT 26
@@ -23,6 +24,7 @@
 #define EC_DABT_LOWER 0x24u
 #define EC_DABT_CUR   0x25u
 #define ESR_FSC_MASK  0x3fu
+#define EC_SVC64      0x15u
 
 extern char exception_vectors[];
 
@@ -91,10 +93,28 @@ void arch_exception_handler(struct exc_frame *frame, u64 kind)
 {
 	u32 ec = (u32)(frame->esr >> ESR_EC_SHIFT) & ESR_EC_MASK;
 
-	/* The kernel runs at EL1 on SP_EL1, so its interrupts arrive in the current-EL SPx slot. */
-	if (kind == EXC_GROUP_CUR_SPX * EXC_TYPES_PER_GROUP + EXC_TYPE_IRQ) {
+	/*
+	 * The kernel runs at EL1 on SP_EL1, so its interrupts arrive in the current-EL SPx
+	 * slot; interrupts that hit a user program arrive in the lower-EL slot.
+	 */
+	if (kind == EXC_GROUP_CUR_SPX * EXC_TYPES_PER_GROUP + EXC_TYPE_IRQ ||
+	    kind == EXC_GROUP_LOWER_A64 * EXC_TYPES_PER_GROUP + EXC_TYPE_IRQ) {
 		irq_dispatch();
 		return;
+	}
+
+	/* From a user program: a system call, or a fault that ends that program only. */
+	if (kind == EXC_GROUP_LOWER_A64 * EXC_TYPES_PER_GROUP + EXC_TYPE_SYNC) {
+		if (ec == EC_SVC64) {
+			/* ELR already points past the svc instruction. */
+			frame->x[0] =
+			    (u64)user_syscall(frame->x[8], frame->x[0], frame->x[1], frame->x[2]);
+			return;
+		}
+		user_kill(ec_is_abort(ec) ? lookup(fsc_names, ARRAY_SIZE(fsc_names),
+						   (u32)frame->esr & ESR_FSC_MASK)
+					  : lookup(ec_names, ARRAY_SIZE(ec_names), ec),
+			  frame->elr, frame->far);
 	}
 
 	/* Anything else is a bug: report it and stop. */

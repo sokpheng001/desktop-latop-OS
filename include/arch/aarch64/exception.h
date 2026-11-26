@@ -16,7 +16,7 @@
 #define EXC_FRAME_SPSR 256
 #define EXC_FRAME_ESR  264
 #define EXC_FRAME_FAR  272
-/* 280 bytes used, rounded up so SP stays 16-byte aligned. */
+#define EXC_FRAME_SP0  280 /* SP_EL0: the user stack pointer of the interrupted thread */
 #define EXC_FRAME_SIZE 288
 
 /*
@@ -44,7 +44,7 @@ struct exc_frame {
 	u64 spsr;
 	u64 esr;
 	u64 far;
-	u64 pad;
+	u64 sp_el0;
 };
 
 STATIC_ASSERT(OFFSET_OF(struct exc_frame, x[30]) == EXC_FRAME_X30, "frame x30 offset");
@@ -52,6 +52,7 @@ STATIC_ASSERT(OFFSET_OF(struct exc_frame, elr) == EXC_FRAME_ELR, "frame elr offs
 STATIC_ASSERT(OFFSET_OF(struct exc_frame, spsr) == EXC_FRAME_SPSR, "frame spsr offset");
 STATIC_ASSERT(OFFSET_OF(struct exc_frame, esr) == EXC_FRAME_ESR, "frame esr offset");
 STATIC_ASSERT(OFFSET_OF(struct exc_frame, far) == EXC_FRAME_FAR, "frame far offset");
+STATIC_ASSERT(OFFSET_OF(struct exc_frame, sp_el0) == EXC_FRAME_SP0, "frame sp_el0 offset");
 STATIC_ASSERT(sizeof(struct exc_frame) == EXC_FRAME_SIZE, "frame size");
 
 /* Called from vectors.S with the saved frame and the vector slot number. */

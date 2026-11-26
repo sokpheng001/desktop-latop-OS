@@ -19,6 +19,12 @@ static void console_sink(char c, void *ctx)
 	hal_console_putc(c);
 }
 
+void console_write(const char *buf, usize len)
+{
+	for (usize i = 0; i < len; i++)
+		console_sink(buf[i], NULL);
+}
+
 void console_init(void)
 {
 	kprintf_set_output(console_sink, NULL);

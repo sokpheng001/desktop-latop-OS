@@ -53,6 +53,51 @@ arch_thread_trampoline:
 	brk	#0
 	.size arch_thread_trampoline, . - arch_thread_trampoline
 
+/*
+ * void arch_enter_user(uptr entry, uptr sp): drop to EL0 at entry with SP_EL0 = sp.
+ * SPSR_EL1 = 0 selects EL0 (M = EL0t) with all of D, A, I, F unmasked.
+ */
+	.global arch_enter_user
+	.type arch_enter_user, %function
+arch_enter_user:
+	msr	sp_el0, x1
+	msr	elr_el1, x0
+	msr	spsr_el1, xzr
+	/* Leave no kernel values behind in registers the program can read. */
+	mov	x0, xzr
+	mov	x1, xzr
+	mov	x2, xzr
+	mov	x3, xzr
+	mov	x4, xzr
+	mov	x5, xzr
+	mov	x6, xzr
+	mov	x7, xzr
+	mov	x8, xzr
+	mov	x9, xzr
+	mov	x10, xzr
+	mov	x11, xzr
+	mov	x12, xzr
+	mov	x13, xzr
+	mov	x14, xzr
+	mov	x15, xzr
+	mov	x16, xzr
+	mov	x17, xzr
+	mov	x18, xzr
+	mov	x19, xzr
+	mov	x20, xzr
+	mov	x21, xzr
+	mov	x22, xzr
+	mov	x23, xzr
+	mov	x24, xzr
+	mov	x25, xzr
+	mov	x26, xzr
+	mov	x27, xzr
+	mov	x28, xzr
+	mov	x29, xzr
+	mov	x30, xzr
+	eret
+	.size arch_enter_user, . - arch_enter_user
+
 /* uptr arch_context_init(uptr stack_top, void (*start)(void *), void *arg) */
 	.global arch_context_init
 	.type arch_context_init, %function
