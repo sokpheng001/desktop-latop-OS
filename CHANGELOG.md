@@ -13,6 +13,15 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Planned
+- Phase 4 (v0.4.0): kernel threads and context switch, round-robin scheduler, user mode and system calls, per-process permissions, message-passing IPC
+
+## [0.3.0] - 2026-11-26
+
+Memory: the kernel finds its RAM in the Device Tree, hands it out in 4 KB pages, runs with the
+MMU and caches on under a least-privilege mapping (code read-only, data never executable, NULL
+unmapped) and has a heap with `kmalloc` / `kfree`.
+
 ### Added
 - RAM discovery from the Device Tree: Flattened Devicetree reader `lib/fdt.c` (written from the Devicetree Specification v0.4, chapter 5) and `kernel/mem.c`; the banner lists every RAM range and the total
 - arm64 kernel image header at the start of the image: QEMU and the Pi firmware load it as a kernel and pass the Device Tree address in x0
@@ -32,11 +41,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 - QEMU runs and boot tests use the raw `kernel8.img` on both boards (the ELF is still built for debugging)
 - `dtc` is now a build requirement; CI installs `device-tree-compiler`
-- Version string set to `0.3.0-dev` for Phase 3 work
 - The abort self-test now loads from an unmapped address and expects a level 1 translation fault (a misaligned load no longer faults once RAM is normal memory)
-
-### Planned
-- Phase 3 (v0.3.0): RAM size from the Device Tree, physical page allocator, MMU on, kernel heap
 
 ## [0.2.0] - 2026-11-25
 
@@ -108,7 +113,8 @@ First boot: OS-001 boots on QEMU `virt` and Raspberry Pi 4 (`raspi4b`) and print
 - `README.md`, `AUTHORS`, `.gitignore`
 - This changelog
 
-[Unreleased]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/sokpheng001/desktop-latop-OS/releases/tag/v0.0.1
