@@ -14,6 +14,7 @@
 #include "lib/kprintf.h"
 #include "mem.h"
 #include "selftest.h"
+#include "thread.h"
 #include "time.h"
 #include "version.h"
 #include "vm.h"
@@ -40,6 +41,7 @@ void kernel_main(uptr dtb)
 	mem_init(dtb);
 	vm_init();
 	heap_init();
+	thread_init();
 	kprintf("Hello from OS-001!\n");
 
 	/* Each source is still disabled at the controller until a driver registers it. */

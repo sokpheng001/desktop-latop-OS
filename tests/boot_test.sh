@@ -24,6 +24,8 @@
 #          100 Hz, checked against the hardware counter
 #   heap   self-test kernel (make KERNEL_TEST=heap): objects of every size class and
 #          whole pages must not overlap, be reused after kfree, and bad frees refused
+#   thread self-test kernel (make KERNEL_TEST=thread): three threads must take turns
+#          in order, keep their registers across switches, and be freed on exit
 #   pmm    self-test kernel (make KERNEL_TEST=pmm): every free page must be handed out
 #          once, written, and returned; double and misaligned frees are refused
 
@@ -31,7 +33,7 @@ set -u
 
 QEMU=${QEMU:-qemu-system-aarch64}
 BOOT_TIMEOUT=${BOOT_TIMEOUT:-10}
-RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-abort rpi4-abort virt-irq rpi4-irq virt-timer rpi4-timer virt-pmm rpi4-pmm virt-rodata rpi4-rodata virt-nx rpi4-nx virt-null rpi4-null virt-heap rpi4-heap"}
+RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-abort rpi4-abort virt-irq rpi4-irq virt-timer rpi4-timer virt-pmm rpi4-pmm virt-rodata rpi4-rodata virt-nx rpi4-nx virt-null rpi4-null virt-heap rpi4-heap virt-thread rpi4-thread"}
 LOG_DIR=build/test
 MAKE=${MAKE:-make}
 
@@ -133,6 +135,11 @@ for run in $RUNS; do
             "EC=0x25 Data abort from current EL" \
             "Translation fault" \
             "*** System halted.")
+        ;;
+    thread)
+        make_args="$make_args KERNEL_TEST=thread"
+        build_dir="build/$board-test-thread"
+        expect=$(printf '%s\n' "$expect" "Self-test: threads OK (order ABCABCABC")
         ;;
     heap)
         make_args="$make_args KERNEL_TEST=heap"

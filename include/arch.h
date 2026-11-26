@@ -38,6 +38,16 @@ struct arch_mem_map {
  */
 int arch_mmu_init(const struct arch_mem_map *maps, int n);
 
+/*
+ * Threads. A thread that is not running is fully described by its saved stack pointer.
+ * arch_context_init prepares a fresh stack so that the first switch to it calls
+ * start(arg) (start must never return) and returns the stack pointer to switch to.
+ * arch_context_switch saves the running thread's stack pointer in *save_sp and
+ * resumes the thread whose saved stack pointer is new_sp.
+ */
+uptr arch_context_init(uptr stack_top, void (*start)(void *), void *arg);
+void arch_context_switch(uptr *save_sp, uptr new_sp);
+
 /* Virtual address bits the MMU translates (the size of the address space). */
 unsigned int arch_mmu_va_bits(void);
 
@@ -47,6 +57,10 @@ void arch_exception_init(void);
 /* Unmask / mask IRQs on this core. */
 void arch_irq_enable(void);
 void arch_irq_disable(void);
+
+/* Mask IRQs and return the previous mask state, for arch_irq_restore. */
+unsigned long arch_irq_save(void);
+void arch_irq_restore(unsigned long flags);
 
 /* Sleep until an interrupt is pending (it may be masked). */
 void arch_wait_for_interrupt(void);

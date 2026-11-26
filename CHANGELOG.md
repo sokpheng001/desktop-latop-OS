@@ -13,6 +13,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- Kernel threads (`kernel/thread.c`): `thread_create`, `thread_yield`, `thread_exit` with a FIFO run queue; the boot code becomes thread 0 ("main"); each thread gets a 16 KB stack from the heap, freed after it exits. Switching is cooperative until the timer-driven scheduler lands
+- AArch64 context switch (`arch/aarch64/context.S`): saves only the AAPCS64 callee-saved registers (x19-x30) on the outgoing thread's stack, so a parked thread is one stack pointer; `arch_irq_save` / `arch_irq_restore`
+- `virt-thread` / `rpi4-thread` boot runs: three threads must run in turn (ABCABCABC), keep their registers across switches and be freed on exit
+
 ### Changed
 - Version string set to `0.4.0-dev` for Phase 4 work
 

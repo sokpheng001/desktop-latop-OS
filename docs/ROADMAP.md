@@ -39,7 +39,7 @@ Coarse items (later phases) are split into small steps before work on them start
 - [x] Kernel heap: `kmalloc` / `kfree`
 
 ## Phase 4 — Processes and permissions (v0.4.0)
-- [ ] Kernel threads and context switch
+- [x] Kernel threads and context switch
 - [ ] Round-robin scheduler driven by the timer
 - [ ] User mode (EL0) and system calls
 - [ ] Per-process permission table checked by the kernel (privacy pillar)

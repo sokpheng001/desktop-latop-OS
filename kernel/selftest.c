@@ -16,6 +16,7 @@
 #include "lib/kprintf.h"
 #include "pmm.h"
 #include "selftest.h"
+#include "thread.h"
 #include "time.h"
 
 #if defined(KERNEL_TEST_IRQ)
@@ -64,6 +65,63 @@ static u32 selftest_code[1] = {0xd65f03c0u};
 #define SELFTEST_TICKS	       50u
 /* Allowed difference between tick time and counter time, in percent. */
 #define SELFTEST_TOLERANCE_PCT 10u
+#endif
+
+#if defined(KERNEL_TEST_THREAD)
+#define SELFTEST_THREADS 3u
+#define SELFTEST_ROUNDS	 3u
+
+static char thread_log[SELFTEST_THREADS * SELFTEST_ROUNDS + 1];
+static usize thread_log_len;
+static u32 thread_bad;
+
+/*
+ * Each worker logs its letter once per turn. Its locals live in callee-saved registers
+ * or on its own stack across every yield, so a wrong value means a broken switch.
+ */
+static void selftest_worker(void *arg)
+{
+	uptr id = (uptr)arg;
+	u64 a = id * 1000u + 1u;
+	u64 b = id * 7u + 3u;
+	u64 sum = 0;
+
+	for (u32 r = 0; r < SELFTEST_ROUNDS; r++) {
+		if (thread_log_len < sizeof(thread_log) - 1)
+			thread_log[thread_log_len++] = (char)('A' + id);
+		sum += a * b + r;
+		thread_yield();
+	}
+	if (sum != (id * 1000u + 1u) * (id * 7u + 3u) * SELFTEST_ROUNDS + 3u)
+		thread_bad++;
+}
+
+/* Main starts three workers and yields until they have all finished and been freed. */
+static void selftest_thread(void)
+{
+	usize live0 = heap_live_count();
+	bool ok = true;
+
+	for (uptr i = 0; i < SELFTEST_THREADS; i++)
+		ok = ok && thread_create("worker", selftest_worker, (void *)i) != NULL;
+	ok = ok && thread_count() == SELFTEST_THREADS + 1;
+	for (u32 spins = 0; ok && thread_count() > 1 && spins < 100; spins++)
+		thread_yield();
+	thread_log[thread_log_len] = '\0';
+
+	const char *expect = "ABCABCABC";
+
+	for (usize i = 0; ok && i <= SELFTEST_THREADS * SELFTEST_ROUNDS; i++)
+		ok = thread_log[i] == expect[i];
+	ok = ok && thread_bad == 0 && thread_count() == 1 && heap_live_count() == live0 &&
+	     thread_current()->id == 0;
+
+	if (ok)
+		kprintf("Self-test: threads OK (order %s, stacks freed)\n", thread_log);
+	else
+		kprintf("Self-test: threads FAILED (order %s, bad=%u, alive=%lu)\n", thread_log,
+			thread_bad, (unsigned long)thread_count());
+}
 #endif
 
 #if defined(KERNEL_TEST_HEAP)
@@ -228,6 +286,9 @@ void selftest_run(void)
 #endif
 #if defined(KERNEL_TEST_HEAP)
 	selftest_heap();
+#endif
+#if defined(KERNEL_TEST_THREAD)
+	selftest_thread();
 #endif
 #if defined(KERNEL_TEST_FAULT)
 	/* Must end in the exception handler's report, never return here. */
