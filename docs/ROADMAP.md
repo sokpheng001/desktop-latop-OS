@@ -33,7 +33,7 @@ Coarse items (later phases) are split into small steps before work on them start
 
 ## Phase 3 — Memory (v0.3.0)
 - [x] Read RAM size from the Device Tree passed by firmware / QEMU
-- [ ] Physical page allocator (4 KB pages)
+- [x] Physical page allocator (4 KB pages)
 - [ ] MMU on: page tables, kernel mapping, device memory mapping
 - [ ] Kernel heap: `kmalloc` / `kfree`
 

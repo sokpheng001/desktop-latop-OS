@@ -18,6 +18,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - arm64 kernel image header at the start of the image: QEMU and the Pi firmware load it as a kernel and pass the Device Tree address in x0
 - `board/rpi4/qemu.dts`, built with `dtc` into `build/rpi4/qemu.dtb` for QEMU runs (QEMU raspi4b only passes a DTB when given one)
 - Host unit tests for the Device Tree reader (`tests/fdt_test.dts`); boot tests check the RAM each board reports
+- Physical page allocator `kernel/pmm.c`: one bitmap bit per 4 KB page, placed in free RAM; single pages by next-fit, contiguous runs, double and misaligned frees refused. It manages all RAM except the kernel image, the memory below it (loader stubs and the Pi spin table), the Device Tree and its `/memreserve/` entries; the banner prints the free and total page counts
+- `fdt_reserved_regions`: reads the Device Tree memory reservation block (Devicetree Specification v0.4, section 5.3)
+- Page allocator tests: host unit tests on fake RAM with two ranges, a gap and unaligned reserved ranges; `virt-pmm` and `rpi4-pmm` boot runs take every free page, write it and return it
 - Progress report for 2026-11-25 (`docs/progress/2026-11-25.md`) covering the whole first working day
 
 ### Changed

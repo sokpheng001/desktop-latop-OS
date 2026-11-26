@@ -13,6 +13,7 @@
 #include "hal.h"
 #include "irq.h"
 #include "lib/kprintf.h"
+#include "pmm.h"
 #include "selftest.h"
 #include "time.h"
 
@@ -50,8 +51,81 @@ static u8 abort_buf[8] ATTR_ALIGNED(8);
 #define SELFTEST_TOLERANCE_PCT 10u
 #endif
 
+#if defined(KERNEL_TEST_PMM)
+/* Contiguous run size for the multi-page check. */
+#define SELFTEST_RUN_PAGES 16u
+/* Mixed into each page's second word, so a page handed out twice is caught. */
+#define SELFTEST_PAGE_TAG  0x05001a11c0de0001ul
+
+extern char kernel_start[];
+extern char kernel_end[];
+
+static bool page_ok(uptr p)
+{
+	return p && !(p & (PMM_PAGE_SIZE - 1)) &&
+	       (p + PMM_PAGE_SIZE <= (uptr)kernel_start || p >= (uptr)kernel_end);
+}
+
+/*
+ * Take every free page, write to it, then give them all back. Each page holds the
+ * address of the previous one (a chain needing no other memory) and a tag derived
+ * from its own address; a page given out twice breaks the chain or the tag.
+ */
+static void selftest_pmm(void)
+{
+	usize free0 = pmm_free_count();
+	usize taken = 0;
+	uptr head = 0;
+	bool ok = free0 > 0;
+
+	for (uptr p; ok && (p = pmm_alloc_page()) != 0; taken++) {
+		volatile u64 *w = (volatile u64 *)p;
+
+		ok = page_ok(p);
+		w[0] = head;
+		w[1] = p ^ SELFTEST_PAGE_TAG;
+		head = p;
+	}
+	ok = ok && taken == free0 && pmm_free_count() == 0 && pmm_alloc_page() == 0;
+
+	usize given = 0;
+
+	while (head && given < taken) {
+		volatile u64 *w = (volatile u64 *)head;
+		uptr prev = (uptr)w[0];
+
+		ok = ok && w[1] == (head ^ SELFTEST_PAGE_TAG) && pmm_free_page(head);
+		head = prev;
+		given++;
+	}
+	ok = ok && head == 0 && given == taken && pmm_free_count() == free0;
+
+	/* A second free of the same page and a misaligned free must be refused. */
+	uptr one = pmm_alloc_page();
+
+	ok = ok && page_ok(one) && pmm_free_page(one) && !pmm_free_page(one) &&
+	     !pmm_free_page(one + 8);
+
+	uptr run = pmm_alloc_pages(SELFTEST_RUN_PAGES);
+
+	for (usize i = 0; ok && i < SELFTEST_RUN_PAGES; i++)
+		ok = page_ok(run + i * PMM_PAGE_SIZE);
+	ok = ok && pmm_free_pages(run, SELFTEST_RUN_PAGES) && pmm_free_count() == free0;
+
+	if (ok)
+		kprintf("Self-test: page allocator OK (%lu pages taken and returned)\n",
+			(unsigned long)taken);
+	else
+		kprintf("Self-test: page allocator FAILED (taken=%lu of %lu, returned=%lu)\n",
+			(unsigned long)taken, (unsigned long)free0, (unsigned long)given);
+}
+#endif
+
 void selftest_run(void)
 {
+#if defined(KERNEL_TEST_PMM)
+	selftest_pmm();
+#endif
 #if defined(KERNEL_TEST_FAULT)
 	/* Must end in the exception handler's report, never return here. */
 	kprintf("Self-test: triggering a breakpoint exception\n");

@@ -17,6 +17,7 @@
 #define FDT_HDR_TOTALSIZE   4
 #define FDT_HDR_OFF_STRUCT  8
 #define FDT_HDR_OFF_STRINGS 12
+#define FDT_HDR_OFF_RSVMAP  16
 #define FDT_HDR_VERSION	    20
 #define FDT_HDR_LAST_COMP   24
 #define FDT_HDR_SIZE	    40
@@ -92,6 +93,36 @@ static u64 read_cells(const u8 *p, u32 cells)
 	for (u32 i = 0; i < cells; i++)
 		v = (v << 32) | be32(p + i * CELL_SIZE);
 	return v;
+}
+
+/* Memory reservation block entry: two big-endian 64-bit values, address then size (spec 5.3). */
+#define FDT_RSV_ENTRY_SIZE 16u
+
+int fdt_reserved_regions(const void *blob, struct fdt_mem_region *out, int max)
+{
+	if (!fdt_valid(blob))
+		return -1;
+
+	const u8 *b = blob;
+	u32 total = be32(b + FDT_HDR_TOTALSIZE);
+	u32 pos = be32(b + FDT_HDR_OFF_RSVMAP);
+	int count = 0;
+
+	/* The list ends with an entry whose address and size are both 0. */
+	for (;; pos += FDT_RSV_ENTRY_SIZE) {
+		if (pos + FDT_RSV_ENTRY_SIZE > total || pos + FDT_RSV_ENTRY_SIZE < pos)
+			return -1;
+		u64 base = read_cells(b + pos, 2);
+		u64 size = read_cells(b + pos + 8, 2);
+
+		if (base == 0 && size == 0)
+			return count;
+		if (count < max) {
+			out[count].base = base;
+			out[count].size = size;
+		}
+		count++;
+	}
 }
 
 int fdt_memory_regions(const void *blob, struct fdt_mem_region *out, int max)

@@ -4,13 +4,15 @@
  * Authors: kwan, oda, sokpheng001
  *
  * Host unit tests for lib/ (string helpers, the kprintf formatter and the
- * Device Tree reader). Built and run on the development machine by tests/lib_test.sh,
- * which passes the compiled tests/fdt_test.dts as the first argument.
+ * Device Tree reader) and the physical page allocator (kernel/pmm.c). Built and
+ * run on the development machine by tests/lib_test.sh, which passes the compiled
+ * tests/fdt_test.dts as the first argument.
  */
 
 #include "lib/fdt.h"
 #include "lib/kprintf.h"
 #include "lib/string.h"
+#include "pmm.h"
 
 /* The few host libc/POSIX functions used, declared by hand so no host headers clash with ours. */
 int puts(const char *s);
@@ -148,18 +150,110 @@ static void test_fdt(const char *path)
 	}
 	check(fdt_memory_regions(fdt_buf, r, 1) == 1, "FAIL fdt_memory_regions respects max");
 
+	count = fdt_reserved_regions(fdt_buf, r, 4);
+	check(count == 2, "FAIL fdt_reserved_regions count (expected 2)");
+	if (count == 2) {
+		check(r[0].base == 0x0 && r[0].size == 0x1000, "FAIL fdt reserved 0");
+		check(r[1].base == 0x100200000 && r[1].size == 0x400000, "FAIL fdt reserved 1");
+	}
+	check(fdt_reserved_regions(fdt_buf, r, 1) == 2,
+	      "FAIL fdt_reserved_regions reports every entry even past max");
+
 	/* A damaged header must be rejected, not parsed. */
 	fdt_buf[0] ^= 0xff;
 	check(!fdt_valid(fdt_buf), "FAIL fdt_valid accepts a bad magic");
 	check(fdt_memory_regions(fdt_buf, r, 4) == -1, "FAIL fdt_memory_regions on bad magic");
+	check(fdt_reserved_regions(fdt_buf, r, 4) == -1, "FAIL fdt_reserved_regions on bad magic");
 	fdt_buf[0] ^= 0xff;
 	check(!fdt_valid(NULL), "FAIL fdt_valid(NULL)");
+}
+
+/*
+ * Fake physical memory for the page allocator: page-aligned host memory stands in for
+ * RAM, so the allocator's bitmap lands in it just as it does on a board.
+ */
+#define PMM_TEST_PAGES 80u
+static u8 pmm_ram[PMM_TEST_PAGES * PMM_PAGE_SIZE] ATTR_ALIGNED(PMM_PAGE_SIZE);
+
+static uptr pg(usize i)
+{
+	return (uptr)pmm_ram + i * PMM_PAGE_SIZE;
+}
+
+/*
+ * Layout: RAM 0 = pages 1-19 (its unaligned start loses page 0), a gap at 20-23,
+ * RAM 1 = pages 24-79. Reserved: pages 2-3, an unaligned range touching 30-31, and a
+ * range outside RAM. The bitmap (16 bytes, one page) must land in page 1, the first
+ * free page, so the free pages are 4-19, 24-29 and 32-79: 70 of 75.
+ */
+static void test_pmm(void)
+{
+	const struct pmm_range ram[] = {
+	    {pg(0) + 100, pg(20) - pg(0) - 100},
+	    {pg(24), pg(80) - pg(24)},
+	};
+	const struct pmm_range reserved[] = {
+	    {pg(2), 2 * PMM_PAGE_SIZE},
+	    {pg(30) + 0x800, 0x1000},
+	    {pg(90), PMM_PAGE_SIZE},
+	};
+	static bool seen[PMM_TEST_PAGES];
+	usize taken = 0;
+	bool all_ok = true;
+	uptr p;
+
+	check(!pmm_init(ram, 0, reserved, 0), "FAIL pmm_init accepts no RAM");
+	const struct pmm_range all_reserved[] = {{pg(0), pg(80) - pg(0)}};
+	check(!pmm_init(ram, 2, all_reserved, 1), "FAIL pmm_init with no room for its bitmap");
+
+	check(pmm_init(ram, 2, reserved, 3), "FAIL pmm_init");
+	check(pmm_total_count() == 75, "FAIL pmm total pages (expected 75)");
+	check(pmm_free_count() == 70, "FAIL pmm free pages (expected 70)");
+
+	/* Every free page exactly once, and nothing reserved, used or outside RAM. */
+	while ((p = pmm_alloc_page()) != 0) {
+		usize i = (p - pg(0)) / PMM_PAGE_SIZE;
+		bool in_free = (i >= 4 && i <= 19) || (i >= 24 && i <= 29) || (i >= 32 && i <= 79);
+
+		all_ok = all_ok && p >= pg(0) && !(p & (PMM_PAGE_SIZE - 1)) && in_free && !seen[i];
+		if (i < PMM_TEST_PAGES)
+			seen[i] = true;
+		if (++taken > 75)
+			break;
+	}
+	check(all_ok, "FAIL pmm_alloc_page returned a bad or repeated page");
+	check(taken == 70 && pmm_free_count() == 0, "FAIL pmm_alloc_page did not take all 70");
+	check(pmm_alloc_pages(1) == 0, "FAIL pmm_alloc_page when empty");
+
+	for (usize i = 0; i < PMM_TEST_PAGES; i++)
+		if (seen[i])
+			all_ok = all_ok && pmm_free_page(pg(i));
+	check(all_ok && pmm_free_count() == 70, "FAIL pmm_free_page of every page");
+
+	/* Bad frees change nothing. */
+	check(!pmm_free_page(pg(5)), "FAIL pmm double free accepted");
+	check(!pmm_free_page(pg(21)), "FAIL pmm free of a page outside RAM accepted");
+	check(!pmm_free_page(pg(5) + 8), "FAIL pmm misaligned free accepted");
+	check(!pmm_free_pages(pg(5), 0), "FAIL pmm free of 0 pages accepted");
+	p = pmm_alloc_page();
+	check(p != 0 && !pmm_free_pages(p, 2) && pmm_free_page(p),
+	      "FAIL pmm partial double free changed state");
+	check(pmm_free_count() == 70, "FAIL pmm free count after bad frees");
+
+	/* Runs must be contiguous, inside one RAM range and clear of reserved pages. */
+	check(pmm_alloc_pages(40) == pg(32), "FAIL pmm_alloc_pages(40) (expected pages 32-71)");
+	check(pmm_alloc_pages(17) == 0, "FAIL pmm_alloc_pages(17) found a run that does not exist");
+	check(pmm_alloc_pages(16) == pg(4), "FAIL pmm_alloc_pages(16) (expected pages 4-19)");
+	check(pmm_free_pages(pg(32), 40) && pmm_free_pages(pg(4), 16) && pmm_free_count() == 70,
+	      "FAIL pmm_free_pages of runs");
+	check(pmm_alloc_pages(71) == 0, "FAIL pmm_alloc_pages larger than free memory");
 }
 
 int main(int argc, char **argv)
 {
 	test_string();
 	test_kprintf();
+	test_pmm();
 	if (argc > 1)
 		test_fdt(argv[1]);
 	else

@@ -18,12 +18,14 @@
 #          an interrupt without a handler must be reported once and disabled
 #   timer  self-test kernel (make KERNEL_TEST=timer): 50 timer ticks must arrive at
 #          100 Hz, checked against the hardware counter
+#   pmm    self-test kernel (make KERNEL_TEST=pmm): every free page must be handed out
+#          once, written, and returned; double and misaligned frees are refused
 
 set -u
 
 QEMU=${QEMU:-qemu-system-aarch64}
 BOOT_TIMEOUT=${BOOT_TIMEOUT:-10}
-RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-abort rpi4-abort virt-irq rpi4-irq virt-timer rpi4-timer"}
+RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-abort rpi4-abort virt-irq rpi4-irq virt-timer rpi4-timer virt-pmm rpi4-pmm"}
 LOG_DIR=build/test
 MAKE=${MAKE:-make}
 
@@ -46,10 +48,18 @@ board_ram() {
     esac
 }
 
+# Pages the allocator tracks: all of the RAM above, in 4 KB pages.
+board_pages() {
+    case "$1" in
+    virt) echo "free of 262144 (4 KB each)" ;;
+    rpi4) echo "free of 245760 (4 KB each)" ;;
+    esac
+}
+
 # Lines every kernel must print; the kernel must always end up at EL1.
 common_expect() {
     printf '%s\n' "Board:  $(board_name "$1")" "EL:     1" "$(board_ram "$1")" \
-        "Hello from OS-001!" "Timer:  100 Hz tick"
+        "$(board_pages "$1")" "Hello from OS-001!" "Timer:  100 Hz tick"
 }
 
 for run in $RUNS; do
@@ -92,6 +102,11 @@ for run in $RUNS; do
         make_args="$make_args KERNEL_TEST=timer"
         build_dir="build/$board-test-timer"
         expect=$(printf '%s\n' "$expect" "Self-test: timer OK")
+        ;;
+    pmm)
+        make_args="$make_args KERNEL_TEST=pmm"
+        build_dir="build/$board-test-pmm"
+        expect=$(printf '%s\n' "$expect" "Self-test: page allocator OK")
         ;;
     *)
         echo "  FAIL    boot $run: unknown variant '$variant'"

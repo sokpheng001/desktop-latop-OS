@@ -17,7 +17,10 @@
 /* Most RAM ranges recorded; boards so far have one (virt) or two (Pi 4). */
 #define MEM_MAX_REGIONS 8
 
-/* Read the RAM ranges from the Device Tree at dtb (0 if the loader passed none). */
+/*
+ * Read the RAM ranges from the Device Tree at dtb (0 if the loader passed none) and
+ * start the page allocator (pmm.h) on the RAM nothing else is using.
+ */
 void mem_init(uptr dtb);
 
 /* Recorded RAM ranges and their total size in bytes (0 if unknown). */

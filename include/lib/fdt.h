@@ -30,6 +30,13 @@ u32 fdt_total_size(const void *blob);
  */
 int fdt_memory_regions(const void *blob, struct fdt_mem_region *out, int max);
 
+/*
+ * Collect the memory reservation block (/memreserve/ entries: RAM the loader or
+ * firmware keeps for itself) into out (at most max entries). Returns the number of
+ * entries in the DTB, which may exceed max, or -1 if the DTB is malformed.
+ */
+int fdt_reserved_regions(const void *blob, struct fdt_mem_region *out, int max);
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* OS001_LIB_FDT_H */

@@ -5,10 +5,14 @@
  *
  * Device Tree used by tests/lib_test.c to check lib/fdt.c: 64-bit addresses and
  * sizes, a memory node with two ranges, a second memory node found only by its
- * device_type, and nested reg properties that must not be taken as RAM.
+ * device_type, nested reg properties that must not be taken as RAM, and two
+ * memory reservation block entries.
  */
 
 /dts-v1/;
+
+/memreserve/ 0x0 0x1000;
+/memreserve/ 0x100200000 0x400000;
 
 / {
 	#address-cells = <2>;
