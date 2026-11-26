@@ -3,7 +3,11 @@
  * Date: 2026-11-26
  * Authors: kwan, oda, sokpheng001
  *
- * Kernel threads with a FIFO run queue. The running thread is never on the queue.
+ * Kernel threads with a round-robin scheduler: a FIFO run queue, and a time slice
+ * charged by the timer tick. When the slice runs out the switch happens at the end
+ * of the interrupt, on the interrupted thread's own stack, so its interrupt frame
+ * stays put until it is resumed and returns from the exception normally.
+ * The running thread is never on the queue.
  * A finished thread cannot free the stack it is still running on, so it goes on a
  * dead list and the next thread to run frees it.
  */
@@ -20,6 +24,8 @@ static struct thread *ready_tail;
 static struct thread *dead;
 static u32 next_id;
 static usize alive;
+static u32 slice_left;
+static volatile bool need_resched;
 
 static void ready_push(struct thread *t)
 {
@@ -65,6 +71,9 @@ static void switch_to(struct thread *next)
 
 	current = next;
 	next->state = THREAD_RUNNING;
+	next->runs++;
+	slice_left = THREAD_SLICE_TICKS;
+	need_resched = false;
 	arch_context_switch(&prev->sp, next->sp);
 	/* Running again as prev: whichever thread switched here may have left a dead one. */
 	reap();
@@ -86,7 +95,9 @@ void thread_init(void)
 	boot_thread.id = next_id++;
 	boot_thread.state = THREAD_RUNNING;
 	boot_thread.name = "main";
+	boot_thread.runs = 1;
 	current = &boot_thread;
+	slice_left = THREAD_SLICE_TICKS;
 	alive = 1;
 }
 
@@ -123,6 +134,10 @@ void thread_yield(void)
 	if (next) {
 		ready_push(current);
 		switch_to(next);
+	} else {
+		/* Nobody else wants the CPU: start a fresh slice. */
+		slice_left = THREAD_SLICE_TICKS;
+		need_resched = false;
 	}
 	arch_irq_restore(flags);
 }
@@ -147,6 +162,18 @@ void thread_exit(void)
 	}
 	switch_to(next);
 	UNREACHABLE();
+}
+
+void thread_tick(void)
+{
+	if (current && slice_left && --slice_left == 0)
+		need_resched = true;
+}
+
+void thread_preempt(void)
+{
+	if (current && need_resched)
+		thread_yield();
 }
 
 struct thread *thread_current(void)

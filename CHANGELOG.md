@@ -14,8 +14,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
-- Kernel threads (`kernel/thread.c`): `thread_create`, `thread_yield`, `thread_exit` with a FIFO run queue; the boot code becomes thread 0 ("main"); each thread gets a 16 KB stack from the heap, freed after it exits. Switching is cooperative until the timer-driven scheduler lands
+- Kernel threads (`kernel/thread.c`): `thread_create`, `thread_yield`, `thread_exit` with a FIFO run queue; the boot code becomes thread 0 ("main"); each thread gets a 16 KB stack from the heap, freed after it exits. Threads can also give up the CPU early with `thread_yield`
 - AArch64 context switch (`arch/aarch64/context.S`): saves only the AAPCS64 callee-saved registers (x19-x30) on the outgoing thread's stack, so a parked thread is one stack pointer; `arch_irq_save` / `arch_irq_restore`
+- Preemptive round-robin scheduling: each thread gets a slice of 2 timer ticks (20 ms); when it runs out, the switch happens at the end of interrupt handling, after every interrupt is completed, on the interrupted thread's own stack (`thread_tick`, `thread_preempt`)
+- `virt-sched` / `rpi4-sched` boot runs: three threads that never yield must each get regular turns from the timer, then stop and be freed
 - `virt-thread` / `rpi4-thread` boot runs: three threads must run in turn (ABCABCABC), keep their registers across switches and be freed on exit
 
 ### Changed

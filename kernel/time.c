@@ -8,6 +8,7 @@
 
 #include "hal.h"
 #include "irq.h"
+#include "thread.h"
 #include "time.h"
 
 #define MS_PER_S 1000u
@@ -20,6 +21,7 @@ static void time_tick(u32 irq, void *ctx)
 	(void)ctx;
 	tick_count++;
 	hal_timer_ack();
+	thread_tick();
 }
 
 void time_init(void)

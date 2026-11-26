@@ -9,6 +9,7 @@
 #include "hal.h"
 #include "irq.h"
 #include "lib/kprintf.h"
+#include "thread.h"
 
 /* Matches the GICv2 architectural limit (IDs 0-1019); enough for every board so far. */
 #define IRQ_MAX 1020u
@@ -51,6 +52,9 @@ void irq_dispatch(void)
 		}
 		hal_irq_complete(token);
 	}
+
+	/* Every interrupt is completed, so another thread may run now if this one's slice is up. */
+	thread_preempt();
 }
 
 u64 irq_unhandled_count(void)

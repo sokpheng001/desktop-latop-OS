@@ -38,6 +38,7 @@ from `board/rpi4/qemu.dts` for the Pi (QEMU fills in the memory node). Self-test
 | `virt-nx`, `rpi4-nx` | Jumping into kernel data is an instruction abort (permission fault): data never runs as code |
 | `virt-null`, `rpi4-null` | Reading address 0 is a translation fault (on the Pi, page 0 is RAM and deliberately unmapped) |
 | `virt-thread`, `rpi4-thread` | Three kernel threads take turns in order, keep their values across switches, and their stacks are freed when they exit |
+| `virt-sched`, `rpi4-sched` | Three threads that never yield all get regular turns from the timer (round-robin, 20 ms slices), then stop and are freed |
 | `virt-heap`, `rpi4-heap` | 512 objects of every size class and multi-page sizes never overlap, are reused after `kfree`, and bad frees are refused |
 | `virt-pmm`, `rpi4-pmm` | Every free page is handed out once, written and returned, none inside the kernel; a double or misaligned free is refused; a 16-page run works |
 

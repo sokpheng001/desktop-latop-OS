@@ -124,6 +124,63 @@ static void selftest_thread(void)
 }
 #endif
 
+#if defined(KERNEL_TEST_SCHED)
+#define SELFTEST_SPINNERS    3u
+#define SELFTEST_SCHED_TICKS 100u /* one second at 100 Hz */
+/* Fewest turns each spinner must get: four threads share 50 slices of 2 ticks. */
+#define SELFTEST_MIN_TURNS   4u
+
+static volatile bool sched_stop;
+static volatile u64 spin_count[SELFTEST_SPINNERS];
+static struct thread *spinners[SELFTEST_SPINNERS];
+
+/* Never yields: only the timer can take the CPU away from it. */
+static void selftest_spinner(void *arg)
+{
+	uptr id = (uptr)arg;
+
+	while (!sched_stop)
+		spin_count[id]++;
+}
+
+static void selftest_sched(void)
+{
+	usize live0 = heap_live_count();
+	bool ok = true;
+
+	for (uptr i = 0; i < SELFTEST_SPINNERS; i++) {
+		spinners[i] = thread_create("spinner", selftest_spinner, (void *)i);
+		ok = ok && spinners[i];
+	}
+
+	/* Main only sleeps; it gets the CPU back on its own turns and counts ticks. */
+	u64 t0 = time_ticks();
+
+	while (ok && time_ticks() - t0 < SELFTEST_SCHED_TICKS)
+		arch_wait_for_interrupt();
+
+	u64 turns[SELFTEST_SPINNERS];
+
+	for (u32 i = 0; i < SELFTEST_SPINNERS; i++) {
+		turns[i] = spinners[i] ? spinners[i]->runs : 0;
+		ok = ok && spin_count[i] > 0 && turns[i] >= SELFTEST_MIN_TURNS;
+	}
+	sched_stop = true;
+	for (u32 spins = 0; thread_count() > 1 && spins < 100; spins++)
+		thread_yield();
+	ok = ok && thread_count() == 1 && heap_live_count() == live0;
+
+	if (ok)
+		kprintf("Self-test: preemptive scheduler OK (turns %lu %lu %lu in %u ticks)\n",
+			(unsigned long)turns[0], (unsigned long)turns[1], (unsigned long)turns[2],
+			SELFTEST_SCHED_TICKS);
+	else
+		kprintf("Self-test: scheduler FAILED (turns %lu %lu %lu, alive=%lu)\n",
+			(unsigned long)turns[0], (unsigned long)turns[1], (unsigned long)turns[2],
+			(unsigned long)thread_count());
+}
+#endif
+
 #if defined(KERNEL_TEST_HEAP)
 /* Objects per round; sizes cycle through every class and into whole pages. */
 #define SELFTEST_HEAP_OBJS 512u
@@ -289,6 +346,9 @@ void selftest_run(void)
 #endif
 #if defined(KERNEL_TEST_THREAD)
 	selftest_thread();
+#endif
+#if defined(KERNEL_TEST_SCHED)
+	selftest_sched();
 #endif
 #if defined(KERNEL_TEST_FAULT)
 	/* Must end in the exception handler's report, never return here. */

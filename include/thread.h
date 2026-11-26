@@ -4,8 +4,8 @@
  * Authors: kwan, oda, sokpheng001
  *
  * Kernel threads: independent flows of control inside the kernel, each with its
- * own stack. Switching is cooperative for now (thread_yield); the timer-driven
- * scheduler comes next.
+ * own stack. Round-robin: a thread runs until it yields or its time slice of
+ * THREAD_SLICE_TICKS timer ticks runs out, then the next ready thread runs.
  */
 
 #ifndef OS001_THREAD_H
@@ -15,6 +15,9 @@
 #include "types.h"
 
 #ifndef __ASSEMBLY__
+
+/* Time slice: timer ticks a thread may run before it is preempted (20 ms at 100 Hz). */
+#define THREAD_SLICE_TICKS 2u
 
 /* Stack per thread: four pages. */
 #define THREAD_STACK_SIZE (16u * 1024u)
@@ -33,6 +36,7 @@ struct thread {
 	void (*entry)(void *);
 	void *arg;
 	void *stack;	     /* NULL for the boot thread, which keeps the boot stack */
+	u64 runs;	     /* times this thread has been switched to */
 	struct thread *next; /* run queue or dead list link */
 };
 
@@ -48,6 +52,16 @@ void thread_yield(void);
 
 /* End the calling thread; its stack is freed once another thread runs. Not for thread 0. */
 void thread_exit(void) ATTR_NORETURN;
+
+/* From the timer interrupt: charge the running thread one tick of its slice. */
+void thread_tick(void);
+
+/*
+ * From the end of interrupt handling, after every interrupt is completed: switch
+ * threads if the running one's slice ran out. The interrupted thread resumes later
+ * exactly where the interrupt hit it.
+ */
+void thread_preempt(void);
 
 struct thread *thread_current(void);
 

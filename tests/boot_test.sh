@@ -26,6 +26,8 @@
 #          whole pages must not overlap, be reused after kfree, and bad frees refused
 #   thread self-test kernel (make KERNEL_TEST=thread): three threads must take turns
 #          in order, keep their registers across switches, and be freed on exit
+#   sched  self-test kernel (make KERNEL_TEST=sched): three threads that never yield
+#          must all get regular turns from the timer, then stop and be freed
 #   pmm    self-test kernel (make KERNEL_TEST=pmm): every free page must be handed out
 #          once, written, and returned; double and misaligned frees are refused
 
@@ -33,7 +35,7 @@ set -u
 
 QEMU=${QEMU:-qemu-system-aarch64}
 BOOT_TIMEOUT=${BOOT_TIMEOUT:-10}
-RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-abort rpi4-abort virt-irq rpi4-irq virt-timer rpi4-timer virt-pmm rpi4-pmm virt-rodata rpi4-rodata virt-nx rpi4-nx virt-null rpi4-null virt-heap rpi4-heap virt-thread rpi4-thread"}
+RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-abort rpi4-abort virt-irq rpi4-irq virt-timer rpi4-timer virt-pmm rpi4-pmm virt-rodata rpi4-rodata virt-nx rpi4-nx virt-null rpi4-null virt-heap rpi4-heap virt-thread rpi4-thread virt-sched rpi4-sched"}
 LOG_DIR=build/test
 MAKE=${MAKE:-make}
 
@@ -140,6 +142,11 @@ for run in $RUNS; do
         make_args="$make_args KERNEL_TEST=thread"
         build_dir="build/$board-test-thread"
         expect=$(printf '%s\n' "$expect" "Self-test: threads OK (order ABCABCABC")
+        ;;
+    sched)
+        make_args="$make_args KERNEL_TEST=sched"
+        build_dir="build/$board-test-sched"
+        expect=$(printf '%s\n' "$expect" "Self-test: preemptive scheduler OK")
         ;;
     heap)
         make_args="$make_args KERNEL_TEST=heap"
