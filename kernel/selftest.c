@@ -130,10 +130,13 @@ static void selftest_thread(void)
 extern const char user_hello_start[], user_hello_end[];
 extern const char user_bad_start[], user_bad_end[];
 extern const char user_peek_start[], user_peek_end[];
+extern const char user_twin_start[], user_twin_end[];
 extern const char user_peek_addr_offset[]; /* an offset, not an address */
 extern char kernel_start[];
 
 #define SELFTEST_USER_EXIT 7
+#define SELFTEST_TWIN_A	   11u
+#define SELFTEST_TWIN_B	   22u
 
 /* Run the three programs to the end; true if each ended the way it must. */
 static bool user_round(void)
@@ -148,46 +151,64 @@ static bool user_round(void)
 		peek[i] = (u8)user_peek_start[i];
 	*(u64 *)(peek + (uptr)user_peek_addr_offset) = (u64)(uptr)kernel_start;
 
+	usize twin_size = (usize)(user_twin_end - user_twin_start);
 	struct user_proc *hello =
-	    user_spawn("hello", user_hello_start, (usize)(user_hello_end - user_hello_start));
+	    user_spawn("hello", user_hello_start, (usize)(user_hello_end - user_hello_start), 0);
 	struct user_proc *bad =
-	    user_spawn("bad", user_bad_start, (usize)(user_bad_end - user_bad_start));
-	struct user_proc *snoop = user_spawn("peek", peek, peek_size);
-	bool ok = hello && bad && snoop;
+	    user_spawn("bad", user_bad_start, (usize)(user_bad_end - user_bad_start), 0);
+	struct user_proc *snoop = user_spawn("peek", peek, peek_size, 0);
+	struct user_proc *twin_a =
+	    user_spawn("twin-a", user_twin_start, twin_size, SELFTEST_TWIN_A);
+	struct user_proc *twin_b =
+	    user_spawn("twin-b", user_twin_start, twin_size, SELFTEST_TWIN_B);
+	bool ok = hello && bad && snoop && twin_a && twin_b;
 
 	for (u32 spins = 0; ok && thread_count() > 1 && spins < 1000; spins++)
 		thread_yield();
 	ok = ok && thread_count() == 1 && hello->exited && hello->exit_code == SELFTEST_USER_EXIT &&
 	     bad->exited && bad->exit_code == USER_EXIT_KILLED && snoop->exited &&
-	     snoop->exit_code == USER_EXIT_KILLED;
+	     snoop->exit_code == USER_EXIT_KILLED && twin_a->exited &&
+	     twin_a->exit_code == SELFTEST_TWIN_A && twin_b->exited &&
+	     twin_b->exit_code == SELFTEST_TWIN_B;
 	if (hello)
 		user_release(hello);
 	if (bad)
 		user_release(bad);
 	if (snoop)
 		user_release(snoop);
+	if (twin_a)
+		user_release(twin_a);
+	if (twin_b)
+		user_release(twin_b);
 	kfree(peek);
 	return ok;
 }
 
 /*
- * Two rounds: the first also creates the page tables for the user windows, which
- * stay; the second must then leave memory exactly as it found it.
+ * Free pages plus the pages the heap keeps for its size classes: every program page
+ * and page table returns to the first, so this must not change across a round.
  */
+static usize pages_not_lost(void)
+{
+	return pmm_free_count() + heap_page_count();
+}
+
+/* Two rounds, each of which must leave memory exactly as it was before the first. */
 static void selftest_user(void)
 {
 	usize live0 = heap_live_count();
-	bool ok = user_round();
-	usize free1 = pmm_free_count();
+	usize free0 = pages_not_lost();
+	bool ok = user_round() && pages_not_lost() == free0;
 
 	ok = ok && user_round();
-	ok = ok && pmm_free_count() == free1 && heap_live_count() == live0;
+	ok = ok && pages_not_lost() == free0 && heap_live_count() == live0;
 	if (ok)
-		kprintf("Self-test: user mode OK (exit code %d, two programs killed, no leaks)\n",
+		kprintf("Self-test: user mode OK (exit code %d, two programs killed, twins kept "
+			"separate memory, no leaks)\n",
 			SELFTEST_USER_EXIT);
 	else
 		kprintf("Self-test: user mode FAILED (free %lu -> %lu, alive=%lu)\n",
-			(unsigned long)free1, (unsigned long)pmm_free_count(),
+			(unsigned long)free0, (unsigned long)pages_not_lost(),
 			(unsigned long)thread_count());
 }
 #endif

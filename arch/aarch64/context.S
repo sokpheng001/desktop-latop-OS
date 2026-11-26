@@ -54,7 +54,8 @@ arch_thread_trampoline:
 	.size arch_thread_trampoline, . - arch_thread_trampoline
 
 /*
- * void arch_enter_user(uptr entry, uptr sp): drop to EL0 at entry with SP_EL0 = sp.
+ * void arch_enter_user(uptr entry, uptr sp, u64 arg): drop to EL0 at entry with
+ * SP_EL0 = sp and x0 = arg.
  * SPSR_EL1 = 0 selects EL0 (M = EL0t) with all of D, A, I, F unmasked.
  */
 	.global arch_enter_user
@@ -64,7 +65,7 @@ arch_enter_user:
 	msr	elr_el1, x0
 	msr	spsr_el1, xzr
 	/* Leave no kernel values behind in registers the program can read. */
-	mov	x0, xzr
+	mov	x0, x2
 	mov	x1, xzr
 	mov	x2, xzr
 	mov	x3, xzr

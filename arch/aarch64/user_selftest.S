@@ -87,6 +87,32 @@ alive_msg:	.ascii "[user] write to code was allowed\n"
 	.balign 4
 user_bad_end:
 
+/*
+ * Twins: two copies run at the same addresses in different address spaces. Each keeps
+ * its argument in its own stack page across several switches, then exits with what it
+ * reads back. Shared memory would make one twin return the other's value.
+ */
+	.global user_twin_start, user_twin_end
+user_twin_start:
+	mov	x19, x0
+	str	x0, [sp, #-16]!
+	mov	x20, #5
+1:	sys	SYS_YIELD
+	subs	x20, x20, #1
+	b.ne	1b
+	ldr	x21, [sp], #16
+	cmp	x21, x19
+	b.ne	2f
+	print	twin_msg, twin_len
+2:	mov	x0, x21
+	sys	SYS_EXIT
+	brk	#0
+
+twin_msg:	.ascii "[user] twin kept its own memory\n"
+	.equ	twin_len, . - twin_msg
+	.balign 4
+user_twin_end:
+
 /* Tries to read kernel memory (the kernel image): must be killed. */
 	.global user_peek_start, user_peek_end
 user_peek_start:

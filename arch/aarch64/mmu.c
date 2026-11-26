@@ -37,6 +37,7 @@
 #define DESC_AP_ALL_RO	(3ul << 6) /* EL1 and EL0 read-only */
 #define DESC_SH_INNER	(3ul << 8)
 #define DESC_AF		(1ul << 10) /* access flag set up front, so no access flag faults */
+#define DESC_NG		(1ul << 11) /* not global: TLB entries tagged with the current ASID */
 #define DESC_PXN	(1ul << 53) /* never executed at EL1 */
 #define DESC_UXN	(1ul << 54) /* never executed at EL0 */
 #define DESC_ADDR_MASK	0x0000fffffffff000ul /* output address bits [47:12] */
@@ -81,9 +82,8 @@ static u64 *new_table(void)
 }
 
 /* Map one block or page at va to pa at the given level, creating tables on the way. */
-static bool map_one(u64 va, u64 pa, int level, u64 attrs)
+static bool map_one(u64 *table, u64 va, u64 pa, int level, u64 attrs)
 {
-	u64 *table = root;
 
 	for (int l = LEVEL_FIRST; l < level; l++) {
 		u64 *entry = &table[(va >> level_shift(l)) % ENTRIES];
@@ -110,9 +110,8 @@ static bool map_one(u64 va, u64 pa, int level, u64 attrs)
 }
 
 /* The level 3 entry for va, or NULL if no level 3 table covers it. */
-static u64 *walk_l3(u64 va)
+static u64 *walk_l3(u64 *table, u64 va)
 {
-	u64 *table = root;
 
 	for (int l = LEVEL_FIRST; table && l < LEVEL_LAST; l++) {
 		u64 e = table[(va >> level_shift(l)) % ENTRIES];
@@ -144,7 +143,7 @@ static bool map_range(u64 base, u64 size, u64 attrs)
 				break;
 			level++;
 		}
-		if (!map_one(va, va, level, attrs))
+		if (!map_one(root, va, va, level, attrs))
 			return false;
 		va += 1ul << level_shift(level);
 	}
@@ -227,17 +226,85 @@ int arch_mmu_init(const struct arch_mem_map *maps, int n)
 	return table_pages;
 }
 
-bool arch_mmu_map_user(u64 va, u64 pa, enum arch_user_perm perm)
+/* Root table and ASID packed the way TTBR0_EL1 holds them (D19.2, TTBR0_EL1). */
+#define TTBR_ASID_SHIFT 48u
+
+static u64 *space_root(uptr space)
 {
-	u64 attrs = ATTRS_RAM | DESC_PXN;
+	return space ? (u64 *)(space & DESC_ADDR_MASK) : root;
+}
+
+static u64 space_asid(uptr space)
+{
+	return (u64)space >> TTBR_ASID_SHIFT;
+}
+
+uptr arch_mmu_space_create(u32 asid)
+{
+	if (!root || asid == 0 || asid > ARCH_MAX_ASID)
+		return 0;
+	u64 *t = new_table();
+
+	if (!t)
+		return 0;
+	/* Share the kernel's mappings: same lower-level tables, so nothing is copied twice. */
+	for (unsigned int i = 0; i < ENTRIES; i++)
+		t[i] = root[i];
+	return (uptr)t | ((uptr)asid << TTBR_ASID_SHIFT);
+}
+
+/* Free a table and every table below it (never the pages they map). */
+static void free_tables(u64 *table, int level)
+{
+	for (unsigned int i = 0; level < LEVEL_LAST && i < ENTRIES; i++)
+		if ((table[i] & (DESC_VALID | DESC_TABLE)) == (DESC_VALID | DESC_TABLE))
+			free_tables((u64 *)(uptr)(table[i] & DESC_ADDR_MASK), level + 1);
+	pmm_free_page((uptr)table);
+	table_pages--;
+}
+
+void arch_mmu_space_destroy(uptr space)
+{
+	u64 *t = space_root(space);
+
+	if (!space || t == root)
+		return;
+	/* Only entries the space added itself are its own; the rest belong to the kernel. */
+	for (unsigned int i = 0; i < ENTRIES; i++)
+		if (t[i] != root[i] &&
+		    (t[i] & (DESC_VALID | DESC_TABLE)) == (DESC_VALID | DESC_TABLE))
+			free_tables((u64 *)(uptr)(t[i] & DESC_ADDR_MASK), LEVEL_FIRST + 1);
+	pmm_free_page((uptr)t);
+	table_pages--;
+	/* Drop every TLB entry tagged with this ASID, so the ASID can be reused. */
+	__asm__ volatile("dsb ishst\n"
+			 "tlbi aside1, %0\n"
+			 "dsb ish\n"
+			 "isb" ::"r"(space_asid(space) << TTBR_ASID_SHIFT)
+			 : "memory");
+}
+
+void arch_mmu_switch(uptr space)
+{
+	u64 ttbr = space ? (u64)space : (u64)(uptr)root;
+
+	/* Kernel mappings are global and user ones carry an ASID: no TLB flush needed. */
+	__asm__ volatile("msr ttbr0_el1, %0\n"
+			 "isb" ::"r"(ttbr)
+			 : "memory");
+}
+
+bool arch_mmu_map_user(uptr space, u64 va, u64 pa, enum arch_user_perm perm)
+{
+	u64 attrs = ATTRS_RAM | DESC_PXN | DESC_NG;
 
 	if (perm == ARCH_USER_CODE)
 		attrs = (attrs & ~DESC_UXN) | DESC_AP_ALL_RO;
 	else
 		attrs |= DESC_AP_ALL_RW;
-	if (!root || (va | pa) & ((1ul << L3_SHIFT) - 1) || va >= (1ul << VA_BITS))
+	if (!space || (va | pa) & ((1ul << L3_SHIFT) - 1) || va >= (1ul << VA_BITS))
 		return false;
-	if (!map_one(va, pa, LEVEL_LAST, attrs))
+	if (!map_one(space_root(space), va, pa, LEVEL_LAST, attrs))
 		return false;
 	/* The new entry must be visible to the table walker before it is used. */
 	__asm__ volatile("dsb ishst\n"
@@ -246,18 +313,18 @@ bool arch_mmu_map_user(u64 va, u64 pa, enum arch_user_perm perm)
 	return true;
 }
 
-void arch_mmu_unmap_user(u64 va)
+void arch_mmu_unmap_user(uptr space, u64 va)
 {
-	u64 *entry = walk_l3(va);
+	u64 *entry = space ? walk_l3(space_root(space), va) : NULL;
 
 	if (!entry)
 		return;
 	*entry = 0;
-	/* Remove any cached translation of va (all ASIDs), then wait for it to finish. */
+	/* Remove the cached translation of va for this ASID, then wait for it to finish. */
 	__asm__ volatile("dsb ishst\n"
-			 "tlbi vaae1, %0\n"
+			 "tlbi vae1, %0\n"
 			 "dsb ish\n"
-			 "isb" ::"r"(va >> L3_SHIFT)
+			 "isb" ::"r"((space_asid(space) << TTBR_ASID_SHIFT) | (va >> L3_SHIFT))
 			 : "memory");
 }
 

@@ -3,10 +3,10 @@
  * Date: 2026-11-26
  * Authors: kwan, oda, sokpheng001
  *
- * User programs and system calls. A program sees only its own window of user
- * addresses; every pointer it passes in is checked against that window before the
- * kernel touches it, and a program that faults is ended without harming the kernel
- * or other programs.
+ * User programs and system calls. Each program has its own address space, so other
+ * programs' pages do not exist for it; every pointer it passes in is checked against
+ * its own pages before the kernel touches it, and a program that faults is ended
+ * without harming the kernel or other programs.
  */
 
 #include "arch.h"
@@ -18,58 +18,69 @@
 #include "thread.h"
 #include "user.h"
 
-static bool slot_used[USER_SLOTS];
+/* ASIDs in use; index 0 stands for ASID 1. */
+static bool asid_used[USER_MAX_PROCS];
 
-static uptr stack_va(const struct user_proc *p)
+static uptr stack_va(void)
 {
-	return p->base + USER_SLOT_SIZE - PMM_PAGE_SIZE;
+	return USER_BASE + USER_SIZE - PMM_PAGE_SIZE;
 }
 
-/* Unmap and free every page of p. Safe to call more than once. */
-static void free_pages(struct user_proc *p)
+/*
+ * Unmap and free every page of p, then its page tables and ASID. Runs in the kernel's
+ * own space (the caller switches first), so p's tables are not in use.
+ */
+static void free_process(struct user_proc *p)
 {
 	for (u32 i = 0; i < p->code_pages; i++) {
-		arch_mmu_unmap_user(p->base + i * PMM_PAGE_SIZE);
+		arch_mmu_unmap_user(p->space, USER_BASE + i * PMM_PAGE_SIZE);
 		pmm_free_page(p->code_pa[i]);
 	}
 	p->code_pages = 0;
 	if (p->stack_pa) {
-		arch_mmu_unmap_user(stack_va(p));
+		arch_mmu_unmap_user(p->space, stack_va());
 		pmm_free_page(p->stack_pa);
 		p->stack_pa = 0;
 	}
-	slot_used[p->slot] = false;
+	if (p->space) {
+		arch_mmu_space_destroy(p->space);
+		p->space = 0;
+	}
+	if (p->asid)
+		asid_used[p->asid - 1] = false;
+	p->asid = 0;
 }
 
 static void user_thread(void *arg)
 {
 	struct user_proc *p = arg;
 
-	arch_enter_user(p->base, p->base + USER_SLOT_SIZE);
+	arch_enter_user(USER_BASE, USER_BASE + USER_SIZE, p->arg);
 }
 
-struct user_proc *user_spawn(const char *name, const void *code, usize size)
+struct user_proc *user_spawn(const char *name, const void *code, usize size, u64 arg)
 {
 	u32 npages = (u32)((size + PMM_PAGE_SIZE - 1) / PMM_PAGE_SIZE);
 	struct user_proc *p = kzalloc(sizeof(*p));
-	u32 slot = 0;
+	u32 a = 0;
 
 	if (!p || size == 0 || npages > USER_MAX_PAGES) {
 		kfree(p);
 		return NULL;
 	}
-	while (slot < USER_SLOTS && slot_used[slot])
-		slot++;
-	if (slot == USER_SLOTS) {
+	while (a < USER_MAX_PROCS && asid_used[a])
+		a++;
+	if (a == USER_MAX_PROCS) {
 		kfree(p);
 		return NULL;
 	}
-	slot_used[slot] = true;
-	p->slot = slot;
-	p->base = USER_BASE + slot * USER_SLOT_SIZE;
+	asid_used[a] = true;
+	p->asid = a + 1;
+	p->arg = arg;
+	p->space = arch_mmu_space_create(p->asid);
 
 	const u8 *src = code;
-	bool ok = true;
+	bool ok = p->space != 0;
 
 	for (u32 i = 0; ok && i < npages; i++) {
 		u8 *page = (u8 *)pmm_alloc_page();
@@ -83,7 +94,8 @@ struct user_proc *user_spawn(const char *name, const void *code, usize size)
 		arch_sync_icache((uptr)page, PMM_PAGE_SIZE);
 		p->code_pa[i] = (uptr)page;
 		p->code_pages = i + 1;
-		ok = arch_mmu_map_user(p->base + i * PMM_PAGE_SIZE, (uptr)page, ARCH_USER_CODE);
+		ok = arch_mmu_map_user(p->space, USER_BASE + i * PMM_PAGE_SIZE, (uptr)page,
+				       ARCH_USER_CODE);
 	}
 	if (ok) {
 		u64 *stack = (u64 *)pmm_alloc_page();
@@ -92,17 +104,14 @@ struct user_proc *user_spawn(const char *name, const void *code, usize size)
 		for (usize w = 0; ok && w < PMM_PAGE_SIZE / sizeof(u64); w++)
 			stack[w] = 0;
 		p->stack_pa = (uptr)stack;
-		ok = ok && arch_mmu_map_user(stack_va(p), (uptr)stack, ARCH_USER_DATA);
+		ok = ok && arch_mmu_map_user(p->space, stack_va(), (uptr)stack, ARCH_USER_DATA);
 	}
 
-	struct thread *t = ok ? thread_create(name, user_thread, p) : NULL;
-
-	if (!t) {
-		free_pages(p);
+	if (!ok || !thread_create_user(name, user_thread, p, p, p->space)) {
+		free_process(p);
 		kfree(p);
 		return NULL;
 	}
-	t->user = p;
 	return p;
 }
 
@@ -119,7 +128,13 @@ static void user_end(int code)
 	struct thread *t = thread_current();
 	struct user_proc *p = t->user;
 
-	free_pages(p);
+	/* Leave p's space before freeing it; kernel code and stack are mapped in every space. */
+	unsigned long flags = arch_irq_save();
+
+	t->space = 0;
+	arch_mmu_switch(0);
+	arch_irq_restore(flags);
+	free_process(p);
 	p->exit_code = code;
 	p->exited = true;
 	thread_exit();
@@ -128,12 +143,12 @@ static void user_end(int code)
 /* True if [va, va + len) lies inside memory p may read: its code or its stack. */
 static bool user_range_ok(const struct user_proc *p, u64 va, u64 len)
 {
-	u64 code_end = p->base + (u64)p->code_pages * PMM_PAGE_SIZE;
-	u64 stack = stack_va(p);
+	u64 code_end = USER_BASE + (u64)p->code_pages * PMM_PAGE_SIZE;
+	u64 stack = stack_va();
 
 	if (va + len < va)
 		return false;
-	return (va >= p->base && va + len <= code_end) ||
+	return (va >= USER_BASE && va + len <= code_end) ||
 	       (va >= stack && va + len <= stack + PMM_PAGE_SIZE);
 }
 

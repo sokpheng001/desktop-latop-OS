@@ -38,6 +38,7 @@ struct thread {
 	void *stack;	     /* NULL for the boot thread, which keeps the boot stack */
 	u64 runs;	     /* times this thread has been switched to */
 	void *user;	     /* struct user_proc for a user program, NULL for kernel threads */
+	uptr space;	     /* address space (arch_mmu_space_create), 0 for the kernel's */
 	struct thread *next; /* run queue or dead list link */
 };
 
@@ -47,6 +48,10 @@ void thread_init(void);
 /* Start entry(arg) in a new thread, queued to run after those already ready. NULL if out of memory.
  */
 struct thread *thread_create(const char *name, void (*entry)(void *), void *arg);
+
+/* thread_create for a user program: user and space are set before the thread can run. */
+struct thread *thread_create_user(const char *name, void (*entry)(void *), void *arg, void *user,
+				  uptr space);
 
 /* Let the next ready thread run; returns when this thread's turn comes round again. */
 void thread_yield(void);

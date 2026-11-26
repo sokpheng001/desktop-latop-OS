@@ -72,6 +72,8 @@ static void switch_to(struct thread *next)
 	current = next;
 	next->state = THREAD_RUNNING;
 	next->runs++;
+	if (next->space != prev->space)
+		arch_mmu_switch(next->space);
 	slice_left = THREAD_SLICE_TICKS;
 	need_resched = false;
 	arch_context_switch(&prev->sp, next->sp);
@@ -103,6 +105,12 @@ void thread_init(void)
 
 struct thread *thread_create(const char *name, void (*entry)(void *), void *arg)
 {
+	return thread_create_user(name, entry, arg, NULL, 0);
+}
+
+struct thread *thread_create_user(const char *name, void (*entry)(void *), void *arg, void *user,
+				  uptr space)
+{
 	struct thread *t = kzalloc(sizeof(*t));
 	void *stack = kmalloc(THREAD_STACK_SIZE);
 
@@ -115,6 +123,8 @@ struct thread *thread_create(const char *name, void (*entry)(void *), void *arg)
 	t->entry = entry;
 	t->arg = arg;
 	t->stack = stack;
+	t->user = user;
+	t->space = space;
 	t->sp = arch_context_init((uptr)stack + THREAD_STACK_SIZE, thread_start, t);
 
 	unsigned long flags = arch_irq_save();

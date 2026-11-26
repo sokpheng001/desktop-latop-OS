@@ -30,7 +30,8 @@
 #          must all get regular turns from the timer, then stop and be freed
 #   user   self-test kernel (make KERNEL_TEST=user): programs run in user mode and use
 #          system calls; bad pointers and unknown calls are refused; programs that
-#          write their own code or read kernel memory are killed, the kernel lives on
+#          write their own code or read kernel memory are killed, the kernel lives on;
+#          two copies of one program at the same addresses keep separate memory
 #   pmm    self-test kernel (make KERNEL_TEST=pmm): every free page must be handed out
 #          once, written, and returned; double and misaligned frees are refused
 
@@ -159,6 +160,7 @@ for run in $RUNS; do
             "[user] unknown call refused" "[user] stack works" \
             "(bad) killed: Permission fault, level 3" \
             "(peek) killed: Permission fault, level 3" \
+            "[user] twin kept its own memory" \
             "Self-test: user mode OK")
         ;;
     heap)

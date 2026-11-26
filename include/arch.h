@@ -54,20 +54,37 @@ enum arch_user_perm {
 	ARCH_USER_DATA, /* user and kernel: read and write; never executed */
 };
 
-/* Map one 4 KB page of physical memory at user address va (both page-aligned). */
-bool arch_mmu_map_user(u64 va, u64 pa, enum arch_user_perm perm);
+/*
+ * Address spaces. A space is the kernel's mappings plus a process's own user pages,
+ * identified by an address space ID (1..ARCH_MAX_ASID) so switching between spaces
+ * needs no TLB flush. 0 stands for the kernel's own space (no user pages).
+ */
+#define ARCH_MAX_ASID 255u
 
-/* Remove the user mapping at va and flush it from the TLB. */
-void arch_mmu_unmap_user(u64 va);
+/* A new space with only the kernel mapped, or 0 if out of memory or asid is invalid. */
+uptr arch_mmu_space_create(u32 asid);
+
+/* Free a space's own page tables and flush its ASID. Its pages must be unmapped first. */
+void arch_mmu_space_destroy(uptr space);
+
+/* Make space (0: the kernel's) the current one on this core. */
+void arch_mmu_switch(uptr space);
+
+/* Map one 4 KB page of physical memory at user address va in space (both page-aligned). */
+bool arch_mmu_map_user(uptr space, u64 va, u64 pa, enum arch_user_perm perm);
+
+/* Remove the user mapping at va from space and flush it from the TLB. */
+void arch_mmu_unmap_user(uptr space, u64 va);
 
 /* Make len bytes of code just written at kernel address addr safe to execute. */
 void arch_sync_icache(uptr addr, usize len);
 
 /*
  * Leave the kernel: continue at entry in user mode (EL0) on the user stack sp, with
- * interrupts enabled. The thread comes back into the kernel only through exceptions.
+ * interrupts enabled and arg in the first argument register; every other register is
+ * zero. The thread comes back into the kernel only through exceptions.
  */
-void arch_enter_user(uptr entry, uptr sp) ATTR_NORETURN;
+void arch_enter_user(uptr entry, uptr sp, u64 arg) ATTR_NORETURN;
 
 /* Virtual address bits the MMU translates (the size of the address space). */
 unsigned int arch_mmu_va_bits(void);

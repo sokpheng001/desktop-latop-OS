@@ -16,32 +16,34 @@
 #ifndef __ASSEMBLY__
 
 /*
- * Each program gets a 2 MB window of user addresses: code at the bottom, a one-page
- * stack at the top, unmapped guard space in between. One window per running program
- * until each process has its own page tables.
+ * Every program has its own address space with the same layout: code at USER_BASE,
+ * a one-page stack ending at USER_BASE + USER_SIZE, unmapped guard space between.
+ * Another program's pages are simply not in its page tables.
  */
 #define USER_BASE	 0x4000000000ul /* 256 GB: above RAM and devices on every board */
-#define USER_SLOT_SIZE	 0x200000ul
-#define USER_SLOTS	 16u
-#define USER_MAX_PAGES	 4u /* code pages per program */
+#define USER_SIZE	 0x40000000ul	/* 1 GB: one level 1 entry of the space */
+#define USER_MAX_PROCS	 64u		/* programs alive at once (one ASID each) */
+#define USER_MAX_PAGES	 4u		/* code pages per program */
 #define USER_EXIT_KILLED (-1)
 
 struct user_proc {
-	u32 slot;
+	u32 asid;
+	uptr space;
 	u32 code_pages;
 	uptr code_pa[USER_MAX_PAGES];
 	uptr stack_pa;
-	uptr base; /* first user address of the slot */
+	u64 arg; /* passed to the program in x0 */
 	int exit_code;
 	bool exited;
 };
 
 /*
- * Start a user program: copy size bytes of position-independent code into fresh pages,
- * map them read+execute for the program, give it a stack, and run it in a new thread.
- * Returns the program, which stays valid after it ends (exit_code), or NULL.
+ * Start a user program in a new address space: copy size bytes of position-independent
+ * code into fresh pages mapped read+execute at USER_BASE, give it a stack, and run it
+ * in a new thread with arg in x0. Returns the program, which stays valid after it ends
+ * (exit_code), or NULL.
  */
-struct user_proc *user_spawn(const char *name, const void *code, usize size);
+struct user_proc *user_spawn(const char *name, const void *code, usize size, u64 arg);
 
 /* Release a finished program's bookkeeping (its pages were freed when it ended). */
 void user_release(struct user_proc *p);
