@@ -36,9 +36,42 @@
 
 /*
  * SCTLR_EL1 with only its RES1 bits for Armv8.0 (bits 29, 28, 23, 22, 20, 11):
- * MMU, caches and alignment checking off, little-endian. The MMU is enabled in Phase 3.
+ * MMU, caches and alignment checking off, little-endian. arch_mmu_init turns the MMU on.
  */
 #define SCTLR_EL1_RES1 UL(0x30d00800)
+
+/* SCTLR_EL1 enable bits: M (bit 0) stage 1 MMU, C (bit 2) data cache, I (bit 12) instruction cache.
+ */
+#define SCTLR_EL1_M (UL(1) << 0)
+#define SCTLR_EL1_C (UL(1) << 2)
+#define SCTLR_EL1_I (UL(1) << 12)
+
+/*
+ * MAIR_EL1 attribute encodings (D19.2, MAIR_EL1), one byte per index:
+ * 0x00 Device-nGnRnE; 0xff Normal, inner and outer write-back, read- and write-allocate.
+ */
+#define MAIR_DEVICE_NGNRNE UL(0x00)
+#define MAIR_NORMAL_WB	   UL(0xff)
+#define MAIR_IDX_DEVICE	   UL(0)
+#define MAIR_IDX_NORMAL	   UL(1)
+
+/* TCR_EL1 fields (D19.2, TCR_EL1). */
+#define TCR_T0SZ_SHIFT UL(0)
+#define TCR_IRGN0_WBWA (UL(1) << 8)  /* table walks: inner write-back, write-allocate */
+#define TCR_ORGN0_WBWA (UL(1) << 10) /* table walks: outer write-back, write-allocate */
+#define TCR_SH0_INNER  (UL(3) << 12) /* table walks: inner shareable */
+#define TCR_TG0_4K     (UL(0) << 14)
+#define TCR_T1SZ_SHIFT UL(16)
+#define TCR_EPD1       (UL(1) << 23) /* no walks through TTBR1_EL1 (upper half unused) */
+#define TCR_TG1_4K     (UL(2) << 30) /* TG1 encodes 4 KB differently from TG0 */
+#define TCR_IPS_SHIFT  UL(32)
+
+/* ID_AA64MMFR0_EL1.PARange (bits 3:0): physical address size, same encoding as TCR_EL1.IPS. */
+#define ID_AA64MMFR0_PARANGE_MASK UL(0xf)
+
+/* CTR_EL0.DminLine (bits 19:16): log2 of the smallest data cache line, in 4-byte words. */
+#define CTR_DMINLINE_SHIFT UL(16)
+#define CTR_DMINLINE_MASK  UL(0xf)
 
 /* SPSR_ELx.M[3:0] = 0b0101: return to EL1 using SP_EL1 ("EL1h"). */
 #define SPSR_MODE_EL1H	 UL(0x5)

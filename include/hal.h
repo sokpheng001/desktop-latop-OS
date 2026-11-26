@@ -45,6 +45,15 @@ void hal_timer_ack(void);     /* from the timer interrupt: clear it and schedule
 u64 hal_counter(void);	      /* monotonic counter value */
 u64 hal_counter_freq(void);   /* counter frequency in Hz */
 
+/* A physical address range of device registers, mapped uncached by the MMU. */
+struct hal_mmio_range {
+	uptr base;
+	usize size;
+};
+
+/* The board's device register ranges; returns how many entries *ranges points to. */
+int hal_mmio_ranges(const struct hal_mmio_range **ranges);
+
 /* Short, stable board identifier, e.g. "qemu-virt" (shown at boot and in logs). */
 const char *hal_board_name(void);
 

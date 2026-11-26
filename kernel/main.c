@@ -15,6 +15,7 @@
 #include "selftest.h"
 #include "time.h"
 #include "version.h"
+#include "vm.h"
 
 /* Image bounds from the linker script (arch/aarch64/kernel.ld). */
 extern char kernel_start[];
@@ -36,6 +37,7 @@ void kernel_main(uptr dtb)
 	else
 		kprintf("DTB:    not passed by the loader\n");
 	mem_init(dtb);
+	vm_init();
 	kprintf("Hello from OS-001!\n");
 
 	/* Each source is still disabled at the controller until a driver registers it. */

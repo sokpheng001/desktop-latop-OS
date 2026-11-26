@@ -41,7 +41,11 @@ static void selftest_irq_handler(u32 irq, void *ctx)
 #endif
 
 #if defined(KERNEL_TEST_ABORT)
-static u8 abort_buf[8] ATTR_ALIGNED(8);
+/*
+ * Inside the 39-bit address space but in no RAM or device range on any board, so with
+ * the MMU on it has no level 1 entry: a load must end in a translation fault at level 1.
+ */
+#define SELFTEST_UNMAPPED_ADDR 0x7f00000000ul
 #endif
 
 #if defined(KERNEL_TEST_TIMER)
@@ -132,18 +136,11 @@ void selftest_run(void)
 	TRAP();
 #endif
 #if defined(KERNEL_TEST_ABORT)
-	/*
-	 * With the MMU off all memory is Device memory, where a misaligned load always
-	 * faults: this must end in a data abort report whose FAR is this address.
-	 */
-	uptr addr = (uptr)abort_buf + 1;
+	/* Must end in a data abort report whose FAR is this address. */
+	volatile u32 *unmapped = (volatile u32 *)SELFTEST_UNMAPPED_ADDR;
 
-	/* Otherwise -mstrict-align lets the compiler split the known-misaligned load into bytes. */
-	HIDE_VALUE(addr);
-	volatile u32 *misaligned = (volatile u32 *)addr;
-
-	kprintf("Self-test: misaligned load from %p\n", (void *)misaligned);
-	(void)*misaligned;
+	kprintf("Self-test: load from unmapped address %p\n", (void *)unmapped);
+	(void)*unmapped;
 	kprintf("Self-test: abort FAILED (the load did not fault)\n");
 #endif
 #if defined(KERNEL_TEST_IRQ)

@@ -12,6 +12,14 @@
 
 #define BOARD_NAME "qemu-virt"
 
+/*
+ * Device registers: GIC, UART, RTC, GPIO, virtio-mmio and the PCIe windows all sit
+ * between 128 MiB and the start of RAM at 1 GiB in QEMU's virt memory map (QEMU
+ * documentation, "arm virt" machine; the base addresses in its Device Tree).
+ */
+#define BOARD_MMIO_BASE 0x08000000ul
+#define BOARD_MMIO_SIZE 0x38000000ul
+
 /* PL011 UART0 */
 #define BOARD_UART_BASE	    0x09000000ul
 #define BOARD_UART_CLOCK_HZ 24000000u /* apb-pclk "clk24mhz" in QEMU's Device Tree */

@@ -21,12 +21,15 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Physical page allocator `kernel/pmm.c`: one bitmap bit per 4 KB page, placed in free RAM; single pages by next-fit, contiguous runs, double and misaligned frees refused. It manages all RAM except the kernel image, the memory below it (loader stubs and the Pi spin table), the Device Tree and its `/memreserve/` entries; the banner prints the free and total page counts
 - `fdt_reserved_regions`: reads the Device Tree memory reservation block (Devicetree Specification v0.4, section 5.3)
 - Page allocator tests: host unit tests on fake RAM with two ranges, a gap and unaligned reserved ranges; `virt-pmm` and `rpi4-pmm` boot runs take every free page, write it and return it
+- MMU on (`arch/aarch64/mmu.c`, `kernel/vm.c`): 4 KB granule, 39-bit identity map built from the page allocator, RAM as cached normal memory, device registers as uncached Device-nGnRnE and never executable, everything else unmapped; data and instruction caches on. Ranges use the largest block that fits (1 GB, 2 MB, 4 KB), so virt needs 2 table pages and the Pi 3. The banner prints an `MMU:` line
+- `hal_mmio_ranges`: each board lists its device register ranges for the MMU
 - Progress report for 2026-11-25 (`docs/progress/2026-11-25.md`) covering the whole first working day
 
 ### Changed
 - QEMU runs and boot tests use the raw `kernel8.img` on both boards (the ELF is still built for debugging)
 - `dtc` is now a build requirement; CI installs `device-tree-compiler`
 - Version string set to `0.3.0-dev` for Phase 3 work
+- The abort self-test now loads from an unmapped address and expects a level 1 translation fault (a misaligned load no longer faults once RAM is normal memory)
 
 ### Planned
 - Phase 3 (v0.3.0): RAM size from the Device Tree, physical page allocator, MMU on, kernel heap

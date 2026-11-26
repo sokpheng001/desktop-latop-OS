@@ -11,8 +11,8 @@
 #   el2    boot virt with virtualization on, so the kernel is entered at EL2
 #   fault  self-test kernel (make KERNEL_TEST=fault): a deliberate exception must
 #          be reported by the exception handler
-#   abort  self-test kernel (make KERNEL_TEST=abort): a misaligned load must be
-#          reported as a data abort (alignment fault) with FAR = the address
+#   abort  self-test kernel (make KERNEL_TEST=abort): a load from an unmapped address
+#          must be reported as a data abort (translation fault) with FAR = the address
 #   irq    self-test kernel (make KERNEL_TEST=irq): a software interrupt must go
 #          through the interrupt controller, the IRQ vector and dispatch, and return;
 #          an interrupt without a handler must be reported once and disabled
@@ -59,7 +59,8 @@ board_pages() {
 # Lines every kernel must print; the kernel must always end up at EL1.
 common_expect() {
     printf '%s\n' "Board:  $(board_name "$1")" "EL:     1" "$(board_ram "$1")" \
-        "$(board_pages "$1")" "Hello from OS-001!" "Timer:  100 Hz tick"
+        "$(board_pages "$1")" "MMU:    on, caches on" "Hello from OS-001!" \
+        "Timer:  100 Hz tick"
 }
 
 for run in $RUNS; do
@@ -88,7 +89,7 @@ for run in $RUNS; do
         expect=$(printf '%s\n' "$expect" \
             "*** Unexpected exception: Synchronous (current EL, SP_ELx)" \
             "EC=0x25 Data abort from current EL" \
-            "FSC:      0x21 Alignment fault" \
+            "FSC:      0x05 Translation fault, level 1" \
             "*** System halted.")
         ;;
     irq)
@@ -155,9 +156,9 @@ for run in $RUNS; do
     done)
     # The abort report must name the exact address the self-test loaded from.
     if [ "$variant" = abort ]; then
-        addr=$(sed -n 's/.*misaligned load from \(0x[0-9a-f]*\).*/\1/p' "$log" | head -n 1)
+        addr=$(sed -n 's/.*load from unmapped address \(0x[0-9a-f]*\).*/\1/p' "$log" | head -n 1)
         if [ -z "$addr" ] || ! grep -qF "FAR_EL1:  $addr" "$log"; then
-            missing=$(printf '%s\n' "$missing" "FAR_EL1 equal to the misaligned address")
+            missing=$(printf '%s\n' "$missing" "FAR_EL1 equal to the unmapped address")
             missing=${missing#"${missing%%[![:space:]]*}"}
         fi
     fi

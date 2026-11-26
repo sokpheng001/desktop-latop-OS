@@ -7,6 +7,7 @@
  */
 
 #include "board.h"
+#include "compiler.h"
 #include "drivers/arm_gtimer.h"
 #include "drivers/gicv2.h"
 #include "drivers/pl011.h"
@@ -38,6 +39,16 @@ void hal_console_putc(char c)
 int hal_console_getc(void)
 {
 	return pl011_getc(&console);
+}
+
+static const struct hal_mmio_range mmio_ranges[] = {
+    {BOARD_MMIO_BASE, BOARD_MMIO_SIZE},
+};
+
+int hal_mmio_ranges(const struct hal_mmio_range **ranges)
+{
+	*ranges = mmio_ranges;
+	return (int)ARRAY_SIZE(mmio_ranges);
 }
 
 const char *hal_board_name(void)

@@ -12,6 +12,13 @@
 
 #define BOARD_NAME "raspberry-pi-4"
 
+/*
+ * Device registers: the low-peripheral window 0xFC000000-0xFFFFFFFF holds the main
+ * peripherals and the ARM local block with the GIC (BCM2711 ARM Peripherals, 1.2.4).
+ */
+#define BOARD_MMIO_BASE 0xfc000000ul
+#define BOARD_MMIO_SIZE 0x04000000ul
+
 /* Main peripherals start at 0xFE000000 as seen by the ARM cores. */
 #define BOARD_PERIPH_BASE 0xfe000000ul
 
