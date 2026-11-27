@@ -23,6 +23,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `virt-disk` boot run (`make KERNEL_TEST=disk`): reads the test disk's signature, writes three sectors at its end and reads them back, and checks out-of-range requests are refused
 - SD host controller driver (`drivers/sdhci/`, from the SD Association's simplified Host Controller and Physical Layer specifications): resets the controller, powers the bus, runs the 400 kHz identification clock and identifies the card (CMD0, CMD8, ACMD41, CMD2, CMD3, CMD9, CMD7), reading its capacity from either CSD version. Registers are accessed 32 bits at a time, as the BCM2711 requires
 - `rpi4` looks for an SD card on EMMC2 (the Pi 4's card slot) and then the older EMMC controller (where QEMU attaches it) and reports it (`Disk:   SD card (SDSC) at ..., 2048 sectors (1024 KiB)`)
+- SD card block reads and writes (`sdhci_rw`): one block per command (CMD17, CMD24) through the buffer data port, polled; byte addresses for SDSC cards and block addresses for SDHC/SDXC; after an error the command and data lines are reset. The clock goes up to 25 MHz once the card is identified. The card is registered as `sd0`
+- `rpi4-disk` boot run: the disk self-test now runs on the SD card too
+- The disk boot runs also check the host's disk image file: the sectors the self-test wrote must be at its end, so a driver that writes to the wrong place cannot pass by reading its own mistake back
 - Host tests for device lookup: a disabled node, a second compatible string, a bus with 32-bit cells, a device with a child node, and a prefix that must not match
 
 ### Changed

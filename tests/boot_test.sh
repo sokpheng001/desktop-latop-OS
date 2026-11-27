@@ -35,7 +35,7 @@
 #          a program that gave up the console permission is refused printing;
 #          a server answers two clients by message and a send to a program that
 #          ends without receiving fails
-#   disk   self-test kernel (make KERNEL_TEST=disk, virt only): the test disk's
+#   disk   self-test kernel (make KERNEL_TEST=disk): the test disk's
 #          signature must be read, sectors written at its end read back the same,
 #          and out-of-range requests refused
 #   pmm    self-test kernel (make KERNEL_TEST=pmm): every free page must be handed out
@@ -45,7 +45,7 @@ set -u
 
 QEMU=${QEMU:-qemu-system-aarch64}
 BOOT_TIMEOUT=${BOOT_TIMEOUT:-10}
-RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-abort rpi4-abort virt-irq rpi4-irq virt-timer rpi4-timer virt-pmm rpi4-pmm virt-rodata rpi4-rodata virt-nx rpi4-nx virt-null rpi4-null virt-heap rpi4-heap virt-thread rpi4-thread virt-sched rpi4-sched virt-user rpi4-user virt-disk"}
+RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-abort rpi4-abort virt-irq rpi4-irq virt-timer rpi4-timer virt-pmm rpi4-pmm virt-rodata rpi4-rodata virt-nx rpi4-nx virt-null rpi4-null virt-heap rpi4-heap virt-thread rpi4-thread virt-sched rpi4-sched virt-user rpi4-user virt-disk rpi4-disk"}
 LOG_DIR=build/test
 MAKE=${MAKE:-make}
 
@@ -252,6 +252,16 @@ for run in $RUNS; do
             missing=$(printf '%s\n' "$missing" "FAR_EL1 equal to the address the self-test touched")
             missing=${missing#"${missing%%[![:space:]]*}"}
         fi
+    fi
+        # The sectors the disk self-test wrote must be at the end of the image file itself,
+    # not just read back the same (which a wrong address would also do): byte o of
+    # sector s holds (s * 31 + o * 7 + 1) mod 256, as in kernel/selftest.c.
+    if [ "$variant" = disk ] && ! tail -c 1536 "$build_dir/disk.img" | od -An -v -tu1 |
+        awk '{ for (i = 1; i <= NF; i++) { s = 2045 + int(n / 512); o = n % 512;
+                   if ($i != (s * 31 + o * 7 + 1) % 256) bad = 1; n++ } }
+             END { exit (bad || n != 1536) }'; then
+        missing=$(printf '%s\n' "$missing" "the written sectors at the end of $build_dir/disk.img")
+        missing=${missing#"${missing%%[![:space:]]*}"}
     fi
     if [ -z "$missing" ]; then
         echo "  PASS    boot $run"

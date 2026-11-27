@@ -11,10 +11,12 @@
  * "EMMC"), so the 8- and 16-bit registers are reached through their 32-bit word.
  */
 
+#include "arch.h"
 #include "drivers/sdhci.h"
 #include "mmio.h"
 
 /* Registers (offsets of the 32-bit words that hold them). */
+#define SDHCI_BLOCK	0x04 /* [11:0] block size, [31:16] block count */
 #define SDHCI_ARGUMENT	0x08
 #define SDHCI_CMD_XFER	0x0c /* [15:0] transfer mode, [31:16] command */
 #define SDHCI_RESPONSE	0x10 /* four words: response bits [127:0] (2.2.7) */
@@ -25,6 +27,7 @@
 #define SDHCI_INT_EN	0x34 /* which interrupts are recorded in SDHCI_INT_STAT */
 #define SDHCI_INT_SIG	0x38 /* which raise the interrupt line */
 #define SDHCI_CAPS	0x40
+#define SDHCI_DATA	0x20 /* buffer data port, one 32-bit word per access (2.2.8) */
 
 /* Present state (2.2.9). */
 #define SDHCI_PRESENT_CMD_INHIBIT (1u << 0)
@@ -44,14 +47,19 @@
 #define SDHCI_CLOCK_DIV_MAX	 0x3ffu
 #define SDHCI_TIMEOUT_MAX	 (0xeu << 16)
 #define SDHCI_RESET_ALL		 (1u << 24)
+#define SDHCI_RESET_CMD		 (1u << 25)
+#define SDHCI_RESET_DAT		 (1u << 26)
 
 /* Base clock in MHz, capabilities bits [15:8] (2.2.26). */
 #define SDHCI_CAPS_BASE_CLOCK(c) (((c) >> 8) & 0xffu)
 
 /* Interrupt status (2.2.17, 2.2.18). */
-#define SDHCI_INT_CMD_DONE (1u << 0)
-#define SDHCI_INT_ERROR	   (1u << 15)
-#define SDHCI_INT_ALL	   0xffffffffu
+#define SDHCI_INT_CMD_DONE  (1u << 0)
+#define SDHCI_INT_XFER_DONE (1u << 1)
+#define SDHCI_INT_WRITE_RDY (1u << 4) /* the buffer can take a block */
+#define SDHCI_INT_READ_RDY  (1u << 5) /* the buffer holds a block */
+#define SDHCI_INT_ERROR	    (1u << 15)
+#define SDHCI_INT_ALL	    0xffffffffu
 
 /* Command register (2.2.6), in bits [31:16] of SDHCI_CMD_XFER. */
 #define SDHCI_CMD_INDEX(n)    ((u32)(n) << 24)
@@ -61,6 +69,11 @@
 #define SDHCI_CMD_RESP_48BUSY (3u << 16)
 #define SDHCI_CMD_CRC	      (1u << 19)
 #define SDHCI_CMD_IDX_CHECK   (1u << 20)
+#define SDHCI_CMD_DATA	      (1u << 21) /* the command transfers data on DAT lines */
+
+/* Transfer mode (2.2.5), in bits [15:0] of SDHCI_CMD_XFER: one block, no DMA. */
+#define SDHCI_XFER_BLKCNT_EN (1u << 1)
+#define SDHCI_XFER_READ	     (1u << 4) /* card to host */
 
 /* Response formats (Physical Layer 4.9) as command flags. */
 #define RESP_NONE SDHCI_CMD_RESP_NONE
@@ -79,6 +92,8 @@
 #define SD_CMD_SEND_IF_COND  8
 #define SD_CMD_SEND_CSD	     9
 #define SD_CMD_SET_BLOCKLEN  16
+#define SD_CMD_READ_BLOCK    17
+#define SD_CMD_WRITE_BLOCK   24
 #define SD_CMD_APP	     55
 #define SD_ACMD_SEND_OP_COND 41
 
@@ -92,8 +107,9 @@
 #define SD_OCR_POWERED	(1u << 31)
 #define SD_OCR_RETRIES	1000u
 
-/* Identification clock: at most 400 kHz (Physical Layer 6.6.6). */
-#define SD_ID_CLOCK_HZ 400000u
+/* Identification clock: at most 400 kHz; then default speed, 25 MHz (Physical Layer 6.6.6). */
+#define SD_ID_CLOCK_HZ	    400000u
+#define SD_DEFAULT_CLOCK_HZ 25000000u
 
 /* Register polls before giving up (QEMU answers at once; real cards within ms). */
 #define SDHCI_POLL_LIMIT 10000000u
@@ -118,31 +134,46 @@ static bool wait_for(const struct sdhci *h, u32 reg, u32 mask, u32 want)
 }
 
 /*
- * Send command index with arg and response format flags; store the response words in
- * resp (four for R2, else one). False if the controller is stuck or reports an error.
+ * Wait for the interrupt status bit, then clear it. False on an error interrupt or a
+ * timeout; the command and data lines are then reset (2.2.16) so the next command
+ * starts clean.
+ */
+static bool wait_int(const struct sdhci *h, u32 bit)
+{
+	for (u32 i = 0; i < SDHCI_POLL_LIMIT; i++) {
+		u32 st = rd(h, SDHCI_INT_STAT);
+
+		if (st & SDHCI_INT_ERROR)
+			break;
+		if (st & bit) {
+			wr(h, SDHCI_INT_STAT, bit);
+			return true;
+		}
+	}
+	wr(h, SDHCI_INT_STAT, SDHCI_INT_ALL);
+	wr(h, SDHCI_CLOCK, rd(h, SDHCI_CLOCK) | SDHCI_RESET_CMD | SDHCI_RESET_DAT);
+	wait_for(h, SDHCI_CLOCK, SDHCI_RESET_CMD | SDHCI_RESET_DAT, 0);
+	return false;
+}
+
+/*
+ * Send command index with arg and flags (response format, plus data and transfer mode
+ * bits for a data command); store the response words in resp (four for R2, else one).
+ * False if the controller is stuck or reports an error.
  */
 static bool command(const struct sdhci *h, u32 index, u32 arg, u32 flags, u32 *resp)
 {
 	u32 inhibit = SDHCI_PRESENT_CMD_INHIBIT;
 
-	if ((flags & SDHCI_CMD_RESP_48BUSY) == SDHCI_CMD_RESP_48BUSY)
+	if ((flags & SDHCI_CMD_RESP_48BUSY) == SDHCI_CMD_RESP_48BUSY || (flags & SDHCI_CMD_DATA))
 		inhibit |= SDHCI_PRESENT_DAT_INHIBIT;
 	if (!wait_for(h, SDHCI_PRESENT, inhibit, 0))
 		return false;
 	wr(h, SDHCI_INT_STAT, SDHCI_INT_ALL);
 	wr(h, SDHCI_ARGUMENT, arg);
 	wr(h, SDHCI_CMD_XFER, SDHCI_CMD_INDEX(index) | flags);
-	for (u32 i = 0;; i++) {
-		u32 st = rd(h, SDHCI_INT_STAT);
-
-		if (st & SDHCI_INT_ERROR || i == SDHCI_POLL_LIMIT) {
-			wr(h, SDHCI_INT_STAT, SDHCI_INT_ALL);
-			return false;
-		}
-		if (st & SDHCI_INT_CMD_DONE)
-			break;
-	}
-	wr(h, SDHCI_INT_STAT, SDHCI_INT_CMD_DONE);
+	if (!wait_int(h, SDHCI_INT_CMD_DONE))
+		return false;
 	if (resp) {
 		int words = (flags & SDHCI_CMD_RESP_48BUSY) == SDHCI_CMD_RESP_136 ? 4 : 1;
 
@@ -242,7 +273,8 @@ static bool identify(struct sdhci *h)
 	/* SDSC cards take a block length; SDHC/SDXC are fixed at 512 bytes. */
 	if (!h->high_cap && !command(h, SD_CMD_SET_BLOCKLEN, SDHCI_BLOCK_SIZE, RESP_R1, NULL))
 		return false;
-	return h->blocks > 0;
+	/* Identification is over: every card supports default speed. */
+	return h->blocks > 0 && set_clock(h, SD_DEFAULT_CLOCK_HZ);
 }
 
 bool sdhci_init(struct sdhci *host)
@@ -265,4 +297,54 @@ bool sdhci_init(struct sdhci *host)
 
 	host->present = identify(host);
 	return host->present;
+}
+
+/*
+ * One block through the buffer data port (SDHCI 3.7.2, transfer without DMA): the
+ * command, then a buffer-ready event, then 128 words, then transfer complete. SDSC
+ * cards are addressed in bytes, SDHC/SDXC in blocks (Physical Layer 4.3.14).
+ */
+static bool transfer_block(const struct sdhci *h, u64 block, u8 *buf, bool write)
+{
+	u32 addr = (u32)(h->high_cap ? block : block * SDHCI_BLOCK_SIZE);
+	u32 flags = RESP_R1 | SDHCI_CMD_DATA | SDHCI_XFER_BLKCNT_EN;
+
+	wr(h, SDHCI_BLOCK, SDHCI_BLOCK_SIZE | (1u << 16));
+	if (!command(h, write ? SD_CMD_WRITE_BLOCK : SD_CMD_READ_BLOCK, addr,
+		     flags | (write ? 0 : SDHCI_XFER_READ), NULL) ||
+	    !wait_int(h, write ? SDHCI_INT_WRITE_RDY : SDHCI_INT_READ_RDY))
+		return false;
+	/* Byte by byte on the memory side: buf need not be 4-byte aligned. */
+	for (u32 i = 0; i < SDHCI_BLOCK_SIZE; i += 4) {
+		if (write) {
+			wr(h, SDHCI_DATA,
+			   (u32)buf[i] | (u32)buf[i + 1] << 8 | (u32)buf[i + 2] << 16 |
+			       (u32)buf[i + 3] << 24);
+		} else {
+			u32 w = rd(h, SDHCI_DATA);
+
+			buf[i] = (u8)w;
+			buf[i + 1] = (u8)(w >> 8);
+			buf[i + 2] = (u8)(w >> 16);
+			buf[i + 3] = (u8)(w >> 24);
+		}
+	}
+	/* For a write this also waits until the card has finished programming. */
+	return wait_int(h, SDHCI_INT_XFER_DONE);
+}
+
+int sdhci_rw(struct sdhci *host, u64 block, void *buf, u32 count, bool write)
+{
+	/* SDSC byte addresses are 32 bits, so such cards end below 4 GB anyway. */
+	if (!host->present || count == 0 || block >= host->blocks || count > host->blocks - block)
+		return -1;
+
+	/* One transfer at a time on the controller: no other thread may start one. */
+	unsigned long flags = arch_irq_save();
+	bool ok = true;
+
+	for (u32 i = 0; ok && i < count; i++)
+		ok = transfer_block(host, block + i, (u8 *)buf + i * SDHCI_BLOCK_SIZE, write);
+	arch_irq_restore(flags);
+	return ok ? 0 : -1;
 }

@@ -32,6 +32,13 @@ struct sdhci {
  */
 bool sdhci_init(struct sdhci *host);
 
+/*
+ * Read (write = false) or write count blocks starting at block, to or from buf, which
+ * holds count * SDHCI_BLOCK_SIZE bytes (any alignment). Polled, one block per command. Returns 0,
+ * or -1 if the range is outside the card or the card or controller reports an error.
+ */
+int sdhci_rw(struct sdhci *host, u64 block, void *buf, u32 count, bool write);
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* OS001_DRIVERS_SDHCI_H */

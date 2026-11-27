@@ -7,6 +7,7 @@
  * GPIO 14 (TXD0) and GPIO 15 (RXD0), header pins 8 and 10.
  */
 
+#include "block.h"
 #include "board.h"
 #include "compiler.h"
 #include "drivers/arm_gtimer.h"
@@ -96,8 +97,27 @@ int hal_mmio_ranges(const struct hal_mmio_range **ranges)
 	return (int)ARRAY_SIZE(mmio_ranges);
 }
 
-/* The SD card, if one is inserted; block transfers come next in Phase 5. */
+/* The SD card, if one is inserted, registered with the block layer as "sd0". */
 static struct sdhci sd;
+
+static int sd_read(void *ctx, u64 sector, void *buf, u32 count)
+{
+	return sdhci_rw(ctx, sector, buf, count, false);
+}
+
+static int sd_write(void *ctx, u64 sector, const void *buf, u32 count)
+{
+	/* The driver only reads buf for a write. */
+	return sdhci_rw(ctx, sector, (void *)(uptr)buf, count, true);
+}
+
+static struct block_dev sd_dev = {
+    .name = "sd0",
+    .sector_size = SDHCI_BLOCK_SIZE,
+    .ctx = &sd,
+    .read = sd_read,
+    .write = sd_write,
+};
 
 void hal_devices_init(uptr dtb)
 {
@@ -109,13 +129,16 @@ void hal_devices_init(uptr dtb)
 		sd.base = hosts[i];
 		sdhci_init(&sd);
 	}
-	if (sd.present)
+	if (sd.present) {
+		sd_dev.sectors = sd.blocks;
+		block_register(&sd_dev);
 		kprintf("Disk:   SD card (%s) at %p, %lu sectors (%lu KiB)\n",
 			sd.high_cap ? "SDHC/SDXC" : "SDSC", (void *)sd.base,
 			(unsigned long)sd.blocks,
 			(unsigned long)(sd.blocks * SDHCI_BLOCK_SIZE / 1024));
-	else
+	} else {
 		kprintf("Disk:   none (no SD card found)\n");
+	}
 }
 
 const char *hal_board_name(void)
