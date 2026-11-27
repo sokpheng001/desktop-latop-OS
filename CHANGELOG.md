@@ -13,6 +13,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- Version string set to `0.5.0-dev` for Phase 5 work
+
 ### Planned
 - Phase 5 (v0.5.0): virtio-blk driver (`virt`), SD card driver (`rpi4`), FAT32 read support and loading a program from disk
 
