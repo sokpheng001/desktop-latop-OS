@@ -128,9 +128,16 @@ static void selftest_thread(void)
 #endif
 
 #if defined(KERNEL_TEST_DISK)
-/* First line of sector 0 of the test disk the Makefile builds. */
-#define SELFTEST_DISK_SIGNATURE "OS-001 test disk\n"
-#define SELFTEST_DISK_RUN	3u /* sectors written and read back in one request */
+/*
+ * The test disk holds a FAT32 file system made by tests/mkfat32.c: sector 0 is its
+ * boot sector, with this OEM name at offset 3 and the 0x55 0xaa signature at 510.
+ */
+#define SELFTEST_DISK_OEM	"OS-001  "
+#define SELFTEST_DISK_OEM_OFF	3u
+#define SELFTEST_DISK_BOOT_SIG0 510u
+/* Sectors written and read back at the end of the disk: the Makefile's DISK_TAIL, which
+ * mkfat32 leaves outside the file system. */
+#define SELFTEST_DISK_RUN	3u
 
 /* Every byte of the run at the end of the disk: differs per sector and per offset. */
 static u8 disk_pattern(u64 sector, usize offset)
@@ -139,20 +146,21 @@ static u8 disk_pattern(u64 sector, usize offset)
 }
 
 /*
- * On the first disk: read the signature in sector 0, write a run of sectors at the
+ * On the first disk: read the boot sector, write a run of sectors at the
  * end and read it back into a cleared buffer, then check out-of-range requests fail.
  */
 static void selftest_disk(void)
 {
 	const struct block_dev *d = block_get(0);
 	u8 *buf = (u8 *)pmm_alloc_page();
-	const char *sig = SELFTEST_DISK_SIGNATURE;
+	const char *sig = SELFTEST_DISK_OEM;
 	bool ok = d && buf && d->sector_size * SELFTEST_DISK_RUN <= PMM_PAGE_SIZE &&
 		  d->sectors > SELFTEST_DISK_RUN;
 
-	ok = ok && block_read(d, 0, buf, 1) == 0;
+	ok = ok && block_read(d, 0, buf, 1) == 0 && buf[SELFTEST_DISK_BOOT_SIG0] == 0x55 &&
+	     buf[SELFTEST_DISK_BOOT_SIG0 + 1] == 0xaa;
 	for (usize i = 0; ok && sig[i]; i++)
-		ok = buf[i] == (u8)sig[i];
+		ok = buf[SELFTEST_DISK_OEM_OFF + i] == (u8)sig[i];
 
 	u64 first = ok ? d->sectors - SELFTEST_DISK_RUN : 0;
 	usize run_bytes = ok ? d->sector_size * SELFTEST_DISK_RUN : 0;
@@ -170,10 +178,10 @@ static void selftest_disk(void)
 	ok = ok && block_read(d, d->sectors, buf, 1) != 0 &&
 	     block_write(d, d->sectors - 1, buf, 2) != 0 && block_read(d, 0, buf, 0) != 0;
 	/* The disk still works after the refusals. */
-	ok = ok && block_read(d, 0, buf, 1) == 0 && buf[0] == (u8)sig[0];
+	ok = ok && block_read(d, 0, buf, 1) == 0 && buf[SELFTEST_DISK_OEM_OFF] == (u8)sig[0];
 
 	if (ok)
-		kprintf("Self-test: disk OK (%s: signature read, %u sectors written and read "
+		kprintf("Self-test: disk OK (%s: boot sector read, %u sectors written and read "
 			"back, bad ranges refused)\n",
 			d->name, SELFTEST_DISK_RUN);
 	else

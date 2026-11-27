@@ -77,15 +77,15 @@ board_pages() {
 }
 
 # Lines every kernel must print; the kernel must always end up at EL1. Both boards
-# also boot with the 1 MiB test disk from the Makefile and must find it.
+# also boot with the 64 MiB FAT32 test disk from the Makefile and must find it.
 common_expect() {
     printf '%s\n' "Board:  $(board_name "$1")" "EL:     1" "$(board_ram "$1")" \
         "$(board_pages "$1")" "MMU:    on, caches on" "Hello from OS-001!" \
         "Timer:  100 Hz tick"
     case "$1" in
-    virt) printf '%s\n' "Disk:   virtio block device at 0x" "2048 sectors (1024 KiB)" \
+    virt) printf '%s\n' "Disk:   virtio block device at 0x" "131072 sectors (65536 KiB)" \
         "virtio: 32 slots, 1 in use" ;;
-    rpi4) printf '%s\n' "Disk:   SD card (SDSC) at 0x" "2048 sectors (1024 KiB)" ;;
+    rpi4) printf '%s\n' "Disk:   SD card (SDSC) at 0x" "131072 sectors (65536 KiB)" ;;
     esac
 }
 
@@ -256,8 +256,9 @@ for run in $RUNS; do
         # The sectors the disk self-test wrote must be at the end of the image file itself,
     # not just read back the same (which a wrong address would also do): byte o of
     # sector s holds (s * 31 + o * 7 + 1) mod 256, as in kernel/selftest.c.
-    if [ "$variant" = disk ] && ! tail -c 1536 "$build_dir/disk.img" | od -An -v -tu1 |
-        awk '{ for (i = 1; i <= NF; i++) { s = 2045 + int(n / 512); o = n % 512;
+        if [ "$variant" = disk ] && ! tail -c 1536 "$build_dir/disk.img" | od -An -v -tu1 |
+        awk -v first=$(($(wc -c < "$build_dir/disk.img") / 512 - 3)) \
+            '{ for (i = 1; i <= NF; i++) { s = first + int(n / 512); o = n % 512;
                    if ($i != (s * 31 + o * 7 + 1) % 256) bad = 1; n++ } }
              END { exit (bad || n != 1536) }'; then
         missing=$(printf '%s\n' "$missing" "the written sectors at the end of $build_dir/disk.img")

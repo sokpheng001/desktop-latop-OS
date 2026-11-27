@@ -87,11 +87,17 @@ IMG  := $(BUILD_DIR)/kernel8.img
 DTC       ?= dtc
 QEMU_DTS  := $(wildcard board/$(BOARD)/qemu.dts)
 
-# Both boards boot with a small test disk (a virtio block device on virt, an SD card
-# on rpi4): 2048 sectors of 512 bytes (1 MiB, a power of two as QEMU's SD card needs),
-# zero-filled except for a signature line in sector 0.
+# Both boards boot with a test disk (a virtio block device on virt, an SD card on
+# rpi4): 131072 sectors of 512 bytes (64 MiB, a power of two as QEMU's SD card needs),
+# holding a FAT32 file system with the files in tests/disk/, made by our own host tool
+# tests/mkfat32.c. The last DISK_TAIL sectors stay outside the file system for the
+# disk self-test to write.
+HOSTCC       ?= cc
+MKFAT32      := build/host/mkfat32
 DISK         := $(BUILD_DIR)/disk.img
-DISK_SECTORS := 2048
+DISK_SECTORS := 131072
+DISK_TAIL    := 3
+DISK_FILES   := $(sort $(wildcard tests/disk/*.TXT))
 QEMU_DTB  := $(if $(QEMU_DTS),$(BUILD_DIR)/qemu.dtb)
 
 # Files checked by format / check-format.
@@ -125,11 +131,15 @@ else
 all: $(IMG) $(QEMU_DTB) $(DISK)
 endif
 
-$(BUILD_DIR)/disk.img:
-	$(call echo_cmd,DISK,$@)
+$(MKFAT32): tests/mkfat32.c
+	$(call echo_cmd,HOSTCC,$@)
 	$(Q)mkdir -p $(dir $@)
-	$(Q)dd if=/dev/zero of=$@ bs=512 count=$(DISK_SECTORS) 2>/dev/null
-	$(Q)printf 'OS-001 test disk\n' | dd of=$@ conv=notrunc 2>/dev/null
+	$(Q)$(HOSTCC) -std=c17 -O2 -Wall -Wextra -Werror $< -o $@
+
+$(BUILD_DIR)/disk.img: $(MKFAT32) $(DISK_FILES)
+	$(call echo_cmd,MKFAT32,$@)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)$(MKFAT32) $@ $(DISK_SECTORS) $(DISK_TAIL) $(DISK_FILES)
 
 $(BUILD_DIR)/qemu.dtb: $(QEMU_DTS)
 	$(call echo_cmd,DTC,$@)

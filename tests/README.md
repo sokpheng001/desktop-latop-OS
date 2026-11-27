@@ -28,7 +28,7 @@ from `board/rpi4/qemu.dts` for the Pi (QEMU fills in the memory node). Self-test
 
 | Run | What it proves |
 |---|---|
-| `virt`, `rpi4` | Normal boot on both boards; console, GIC and timer come up; every run must find the 1 MiB test disk (virtio on `virt`, SD card on `rpi4`) |
+| `virt`, `rpi4` | Normal boot on both boards; console, GIC and timer come up; every run must find the 64 MiB FAT32 test disk (virtio on `virt`, SD card on `rpi4`) |
 | `virt-el2` | `virt` with virtualization: entered at EL2, the kernel drops to EL1 (the Pi is always entered at EL2) |
 | `virt-fault`, `rpi4-fault` | A breakpoint reaches the exception vectors and is reported (EC `0x3c`) |
 | `virt-abort`, `rpi4-abort` | With the MMU on, a load from an unmapped address is reported as a data abort, level 1 translation fault, with FAR = that address |
@@ -39,7 +39,7 @@ from `board/rpi4/qemu.dts` for the Pi (QEMU fills in the memory node). Self-test
 | `virt-null`, `rpi4-null` | Reading address 0 is a translation fault (on the Pi, page 0 is RAM and deliberately unmapped) |
 | `virt-thread`, `rpi4-thread` | Three kernel threads take turns in order, keep their values across switches, and their stacks are freed when they exit |
 | `virt-sched`, `rpi4-sched` | Three threads that never yield all get regular turns from the timer (round-robin, 20 ms slices), then stop and are freed |
-| `virt-disk`, `rpi4-disk` | The test disk's signature is read from sector 0 (virtio disk on `virt`, SD card on `rpi4`); three sectors written at the end of the disk read back the same and are found at the end of the disk image file on the host; out-of-range and empty requests are refused |
+| `virt-disk`, `rpi4-disk` | The test disk's FAT32 boot sector (OEM name, 0x55 0xaa signature) is read from sector 0 (virtio disk on `virt`, SD card on `rpi4`); three sectors written at the end of the disk read back the same and are found at the end of the disk image file on the host; out-of-range and empty requests are refused |
 | `virt-user`, `rpi4-user` | User programs run at EL0 and use system calls; a bad pointer and an unknown call are refused; programs that write their own code or read kernel memory are killed while the kernel keeps running; two copies of one program at the same addresses keep separate memory; a program that gave up the console permission is refused printing and cannot get it back; a server answers two clients by message and a send to a program that ends without receiving fails; no pages or page tables leak |
 | `virt-heap`, `rpi4-heap` | 512 objects of every size class and multi-page sizes never overlap, are reused after `kfree`, and bad frees are refused |
 | `virt-pmm`, `rpi4-pmm` | Every free page is handed out once, written and returned, none inside the kernel; a double or misaligned free is refused; a 16-page run works |

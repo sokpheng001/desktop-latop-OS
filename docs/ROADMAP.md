@@ -51,7 +51,9 @@ Coarse items (later phases) are split into small steps before work on them start
 - [x] virtio-blk: read and write sectors through a virtqueue (`virt`)
 - [x] SD card found: host controller reset, card identified and its size read (`rpi4`)
 - [x] SD card: read and write blocks, registered as a block device (`rpi4`)
-- [ ] FAT32 read support; load a program from disk
+- [x] FAT32 test disk built by our own host tool (`tests/mkfat32.c`)
+- [ ] FAT32 read support: mount the disk, find a file in the root directory, read it
+- [ ] Load a program from disk and run it
 
 ## Phase 6 — Screen and input (v0.6.0)
 - [ ] Framebuffer: `ramfb` / virtio-gpu (`virt`), mailbox framebuffer (`rpi4`)
