@@ -14,6 +14,7 @@
 #include "heap.h"
 #include "irq.h"
 #include "lib/kprintf.h"
+#include "perm.h"
 #include "pmm.h"
 #include "selftest.h"
 #include "thread.h"
@@ -131,12 +132,16 @@ extern const char user_hello_start[], user_hello_end[];
 extern const char user_bad_start[], user_bad_end[];
 extern const char user_peek_start[], user_peek_end[];
 extern const char user_twin_start[], user_twin_end[];
+extern const char user_perm_start[], user_perm_end[];
 extern const char user_peek_addr_offset[]; /* an offset, not an address */
 extern char kernel_start[];
 
-#define SELFTEST_USER_EXIT 7
-#define SELFTEST_TWIN_A	   11u
-#define SELFTEST_TWIN_B	   22u
+#define SELFTEST_USER_EXIT  7
+#define SELFTEST_TWIN_A	    11u
+#define SELFTEST_TWIN_B	    22u
+#define SELFTEST_PERM_EXIT  9
+/* A bit outside PERM_ALL: user_spawn must ignore it. */
+#define SELFTEST_PERM_BOGUS (1u << 31)
 
 /* Run the three programs to the end; true if each ended the way it must. */
 static bool user_round(void)
@@ -152,16 +157,19 @@ static bool user_round(void)
 	*(u64 *)(peek + (uptr)user_peek_addr_offset) = (u64)(uptr)kernel_start;
 
 	usize twin_size = (usize)(user_twin_end - user_twin_start);
-	struct user_proc *hello =
-	    user_spawn("hello", user_hello_start, (usize)(user_hello_end - user_hello_start), 0);
-	struct user_proc *bad =
-	    user_spawn("bad", user_bad_start, (usize)(user_bad_end - user_bad_start), 0);
-	struct user_proc *snoop = user_spawn("peek", peek, peek_size, 0);
+	struct user_proc *hello = user_spawn(
+	    "hello", user_hello_start, (usize)(user_hello_end - user_hello_start), 0, PERM_CONSOLE);
+	struct user_proc *bad = user_spawn("bad", user_bad_start,
+					   (usize)(user_bad_end - user_bad_start), 0, PERM_CONSOLE);
+	struct user_proc *snoop = user_spawn("peek", peek, peek_size, 0, PERM_CONSOLE);
 	struct user_proc *twin_a =
-	    user_spawn("twin-a", user_twin_start, twin_size, SELFTEST_TWIN_A);
+	    user_spawn("twin-a", user_twin_start, twin_size, SELFTEST_TWIN_A, PERM_CONSOLE);
 	struct user_proc *twin_b =
-	    user_spawn("twin-b", user_twin_start, twin_size, SELFTEST_TWIN_B);
-	bool ok = hello && bad && snoop && twin_a && twin_b;
+	    user_spawn("twin-b", user_twin_start, twin_size, SELFTEST_TWIN_B, PERM_CONSOLE);
+	struct user_proc *perm =
+	    user_spawn("perm", user_perm_start, (usize)(user_perm_end - user_perm_start), 0,
+		       PERM_CONSOLE | SELFTEST_PERM_BOGUS);
+	bool ok = hello && bad && snoop && twin_a && twin_b && perm;
 
 	for (u32 spins = 0; ok && thread_count() > 1 && spins < 1000; spins++)
 		thread_yield();
@@ -169,7 +177,8 @@ static bool user_round(void)
 	     bad->exited && bad->exit_code == USER_EXIT_KILLED && snoop->exited &&
 	     snoop->exit_code == USER_EXIT_KILLED && twin_a->exited &&
 	     twin_a->exit_code == SELFTEST_TWIN_A && twin_b->exited &&
-	     twin_b->exit_code == SELFTEST_TWIN_B;
+	     twin_b->exit_code == SELFTEST_TWIN_B && perm->exited &&
+	     perm->exit_code == SELFTEST_PERM_EXIT;
 	if (hello)
 		user_release(hello);
 	if (bad)
@@ -180,6 +189,8 @@ static bool user_round(void)
 		user_release(twin_a);
 	if (twin_b)
 		user_release(twin_b);
+	if (perm)
+		user_release(perm);
 	kfree(peek);
 	return ok;
 }
@@ -204,7 +215,7 @@ static void selftest_user(void)
 	ok = ok && pages_not_lost() == free0 && heap_live_count() == live0;
 	if (ok)
 		kprintf("Self-test: user mode OK (exit code %d, two programs killed, twins kept "
-			"separate memory, no leaks)\n",
+			"separate memory, permissions enforced, no leaks)\n",
 			SELFTEST_USER_EXIT);
 	else
 		kprintf("Self-test: user mode FAILED (free %lu -> %lu, alive=%lu)\n",

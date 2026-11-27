@@ -25,6 +25,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `user_spawn` passes an argument to the program in x0; `thread_create_user` sets a thread's program and address space before it can run
 - `arch_mmu_map_user`, `arch_mmu_unmap_user` (with TLB invalidation), `arch_sync_icache`, `arch_enter_user`; `console_write`
 - `virt-user` / `rpi4-user` boot runs: a program says hello, yields, has a bad pointer and an unknown call refused and exits with code 7; programs that write their own code or read kernel memory are killed; two copies of one program at the same addresses keep separate memory; two rounds leave no pages, page tables or heap memory behind
+- Per-process permissions (`include/perm.h`, `kernel/perm.c`): each program holds a set of permissions (console, files, network, camera, microphone) given when it is started (`user_spawn` now takes the set; unknown bits are ignored). `write` needs the console permission and returns `-EPERM` without it; every refusal is reported on the console (`perm: thread N (name) denied console`)
+- System calls `perm_get` (3) and `perm_drop` (4): a program can give permissions up for good but never gain one back, following Capsicum's capability mode
+- The `virt-user` / `rpi4-user` boot runs also start a program with only the console permission (plus an unknown bit), which gives it up, is refused printing, and cannot get it back
 - `virt-thread` / `rpi4-thread` boot runs: three threads must run in turn (ABCABCABC), keep their registers across switches and be freed on exit
 
 ### Changed

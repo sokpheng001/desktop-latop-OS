@@ -32,7 +32,8 @@ struct user_proc {
 	u32 code_pages;
 	uptr code_pa[USER_MAX_PAGES];
 	uptr stack_pa;
-	u64 arg; /* passed to the program in x0 */
+	u64 arg;   /* passed to the program in x0 */
+	u32 perms; /* PERM_* bits the program holds (perm.h) */
 	int exit_code;
 	bool exited;
 };
@@ -40,10 +41,10 @@ struct user_proc {
 /*
  * Start a user program in a new address space: copy size bytes of position-independent
  * code into fresh pages mapped read+execute at USER_BASE, give it a stack, and run it
- * in a new thread with arg in x0. Returns the program, which stays valid after it ends
- * (exit_code), or NULL.
+ * in a new thread with arg in x0, holding the permissions in perms (unknown bits are
+ * ignored). Returns the program, which stays valid after it ends (exit_code), or NULL.
  */
-struct user_proc *user_spawn(const char *name, const void *code, usize size, u64 arg);
+struct user_proc *user_spawn(const char *name, const void *code, usize size, u64 arg, u32 perms);
 
 /* Release a finished program's bookkeeping (its pages were freed when it ended). */
 void user_release(struct user_proc *p);

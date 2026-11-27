@@ -6,13 +6,15 @@
  * User programs and system calls. Each program has its own address space, so other
  * programs' pages do not exist for it; every pointer it passes in is checked against
  * its own pages before the kernel touches it, and a program that faults is ended
- * without harming the kernel or other programs.
+ * without harming the kernel or other programs. System calls that reach anything
+ * outside the program's own memory are checked against its permission set (perm.h).
  */
 
 #include "arch.h"
 #include "console.h"
 #include "heap.h"
 #include "lib/kprintf.h"
+#include "perm.h"
 #include "pmm.h"
 #include "syscall.h"
 #include "thread.h"
@@ -58,7 +60,7 @@ static void user_thread(void *arg)
 	arch_enter_user(USER_BASE, USER_BASE + USER_SIZE, p->arg);
 }
 
-struct user_proc *user_spawn(const char *name, const void *code, usize size, u64 arg)
+struct user_proc *user_spawn(const char *name, const void *code, usize size, u64 arg, u32 perms)
 {
 	u32 npages = (u32)((size + PMM_PAGE_SIZE - 1) / PMM_PAGE_SIZE);
 	struct user_proc *p = kzalloc(sizeof(*p));
@@ -77,6 +79,7 @@ struct user_proc *user_spawn(const char *name, const void *code, usize size, u64
 	asid_used[a] = true;
 	p->asid = a + 1;
 	p->arg = arg;
+	p->perms = perms & PERM_ALL;
 	p->space = arch_mmu_space_create(p->asid);
 
 	const u8 *src = code;
@@ -152,6 +155,20 @@ static bool user_range_ok(const struct user_proc *p, u64 va, u64 len)
 	       (va >= stack && va + len <= stack + PMM_PAGE_SIZE);
 }
 
+/*
+ * True if the running program p holds perm. A refusal is reported on the console, so
+ * the user can see what a program tried to reach.
+ */
+static bool user_may(const struct user_proc *p, u32 perm)
+{
+	if (perm_has(p->perms, perm))
+		return true;
+	struct thread *t = thread_current();
+
+	kprintf("perm: thread %u (%s) denied %s\n", t->id, t->name, perm_name(perm));
+	return false;
+}
+
 long user_syscall(u64 nr, u64 a0, u64 a1, u64 a2)
 {
 	struct user_proc *p = thread_current()->user;
@@ -159,6 +176,8 @@ long user_syscall(u64 nr, u64 a0, u64 a1, u64 a2)
 	(void)a2;
 	switch (nr) {
 	case SYS_WRITE:
+		if (!user_may(p, PERM_CONSOLE))
+			return -SYS_EPERM;
 		if (!user_range_ok(p, a0, a1))
 			return -SYS_EFAULT;
 		console_write((const char *)(uptr)a0, (usize)a1);
@@ -168,6 +187,12 @@ long user_syscall(u64 nr, u64 a0, u64 a1, u64 a2)
 	case SYS_YIELD:
 		thread_yield();
 		return 0;
+	case SYS_PERM_GET:
+		return (long)p->perms;
+	case SYS_PERM_DROP:
+		/* Only ever clears bits: there is no call that sets one. */
+		p->perms &= ~(u32)a0;
+		return (long)p->perms;
 	default:
 		return -SYS_ENOSYS;
 	}

@@ -31,7 +31,8 @@
 #   user   self-test kernel (make KERNEL_TEST=user): programs run in user mode and use
 #          system calls; bad pointers and unknown calls are refused; programs that
 #          write their own code or read kernel memory are killed, the kernel lives on;
-#          two copies of one program at the same addresses keep separate memory
+#          two copies of one program at the same addresses keep separate memory;
+#          a program that gave up the console permission is refused printing
 #   pmm    self-test kernel (make KERNEL_TEST=pmm): every free page must be handed out
 #          once, written, and returned; double and misaligned frees are refused
 
@@ -161,6 +162,8 @@ for run in $RUNS; do
             "(bad) killed: Permission fault, level 3" \
             "(peek) killed: Permission fault, level 3" \
             "[user] twin kept its own memory" \
+            "[user] holding the console permission only" \
+            "(perm) denied console" \
             "Self-test: user mode OK")
         ;;
     heap)

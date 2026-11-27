@@ -9,6 +9,7 @@
  * addresses) and reach the kernel only through svc.
  */
 
+#include "perm.h"
 #include "syscall.h"
 
 #if defined(KERNEL_TEST_USER)
@@ -112,6 +113,55 @@ twin_msg:	.ascii "[user] twin kept its own memory\n"
 	.equ	twin_len, . - twin_msg
 	.balign 4
 user_twin_end:
+
+/*
+ * Started holding only PERM_CONSOLE (plus an unknown bit the kernel must ignore). Gives
+ * console access up, then must be refused printing and unable to get it back. Exits 9
+ * if every check passed, else the number of the check that failed.
+ */
+	.global user_perm_start, user_perm_end
+user_perm_start:
+	sys	SYS_PERM_GET
+	cmp	x0, #PERM_CONSOLE
+	b.ne	1f
+	print	perm_msg, perm_len
+
+	mov	x0, #PERM_CONSOLE
+	sys	SYS_PERM_DROP
+	cbnz	x0, 2f
+
+	print	perm_fail_msg, perm_fail_len
+	cmn	x0, #SYS_EPERM
+	b.ne	3f
+
+	/* Dropping nothing or everything must not bring any permission back. */
+	mov	x0, #0
+	sys	SYS_PERM_DROP
+	cbnz	x0, 4f
+	mov	x0, #-1
+	sys	SYS_PERM_DROP
+	cbnz	x0, 4f
+	sys	SYS_PERM_GET
+	cbnz	x0, 4f
+
+	mov	x0, #9
+	sys	SYS_EXIT
+1:	mov	x0, #1
+	sys	SYS_EXIT
+2:	mov	x0, #2
+	sys	SYS_EXIT
+3:	mov	x0, #3
+	sys	SYS_EXIT
+4:	mov	x0, #4
+	sys	SYS_EXIT
+	brk	#0
+
+perm_msg:	.ascii "[user] holding the console permission only\n"
+	.equ	perm_len, . - perm_msg
+perm_fail_msg:	.ascii "[user] printed after giving up the console\n"
+	.equ	perm_fail_len, . - perm_fail_msg
+	.balign 4
+user_perm_end:
 
 /* Tries to read kernel memory (the kernel image): must be killed. */
 	.global user_peek_start, user_peek_end
