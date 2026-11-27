@@ -40,6 +40,9 @@
 
 #define CELL_SIZE 4u
 
+/* Deepest node fdt_find_compatible follows (the root is depth 1). */
+#define FDT_MAX_DEPTH 16
+
 static u32 be32(const u8 *p)
 {
 	return ((u32)p[0] << 24) | ((u32)p[1] << 16) | ((u32)p[2] << 8) | (u32)p[3];
@@ -57,6 +60,21 @@ static bool str_eq(const char *a, const char *b)
 		b++;
 	}
 	return *a == *b;
+}
+
+/* True if the stringlist value[0..len) (NUL-separated strings, spec 2.2.4) holds s. */
+static bool stringlist_has(const u8 *value, u32 len, const char *s)
+{
+	u32 start = 0;
+
+	for (u32 i = 0; i < len; i++) {
+		if (value[i] != '\0')
+			continue;
+		if (str_eq((const char *)value + start, s))
+			return true;
+		start = i + 1;
+	}
+	return false;
 }
 
 /* "memory" or "memory@<unit-address>" */
@@ -226,5 +244,142 @@ int fdt_memory_regions(const void *blob, struct fdt_mem_region *out, int max)
 		if (addr_cells == 0 || addr_cells > FDT_MAX_CELLS || size_cells == 0 ||
 		    size_cells > FDT_MAX_CELLS)
 			return -1;
+	}
+}
+
+/* What fdt_find_compatible tracks for each open node. */
+struct fdt_node_state {
+	u32 addr_cells; /* #address-cells / #size-cells this node sets for its children */
+	u32 size_cells;
+	bool match;
+	bool enabled;
+	const u8 *reg;
+	u32 reg_len;
+	const u8 *irq;
+	u32 irq_len;
+};
+
+/* Store node n, whose parent sets cells p, as a device in d. False if reg is malformed. */
+static bool fill_device(const struct fdt_node_state *n, const struct fdt_node_state *p,
+			struct fdt_device *d)
+{
+	u32 ac = p->addr_cells, sc = p->size_cells;
+
+	if (ac == 0 || ac > FDT_MAX_CELLS || sc > FDT_MAX_CELLS)
+		return false;
+	d->base = read_cells(n->reg, ac);
+	d->size = sc ? read_cells(n->reg + ac * CELL_SIZE, sc) : 0;
+	d->irq_cells = 0;
+	for (u32 i = 0; n->irq && i < FDT_MAX_IRQ_CELLS && (i + 1) * CELL_SIZE <= n->irq_len; i++) {
+		d->irq[i] = be32(n->irq + i * CELL_SIZE);
+		d->irq_cells = i + 1;
+	}
+	return true;
+}
+
+int fdt_find_compatible(const void *blob, const char *compat, struct fdt_device *out, int max)
+{
+	if (!fdt_valid(blob))
+		return -1;
+
+	const u8 *b = blob;
+	u32 total = be32(b + FDT_HDR_TOTALSIZE);
+	u32 pos = be32(b + FDT_HDR_OFF_STRUCT);
+	u32 strings = be32(b + FDT_HDR_OFF_STRINGS);
+	/*
+	 * node[d] is the open node at depth d; node[0] stands for the root's parent and
+	 * holds the default cell sizes that apply to the root (spec 2.3.5). A node's own
+	 * reg is read with its parent's cell sizes.
+	 */
+	struct fdt_node_state node[FDT_MAX_DEPTH + 1];
+	int depth = 0;
+	int count = 0;
+
+	node[0].addr_cells = FDT_DEFAULT_ADDR_CELLS;
+	node[0].size_cells = FDT_DEFAULT_SIZE_CELLS;
+	if (strings >= total)
+		return -1;
+
+	for (;;) {
+		if (pos + CELL_SIZE > total)
+			return -1;
+		u32 token = be32(b + pos);
+
+		pos += CELL_SIZE;
+
+		switch (token) {
+		case FDT_BEGIN_NODE: {
+			u32 len = 0;
+
+			while (pos + len < total && b[pos + len])
+				len++;
+			if (pos + len >= total || depth == FDT_MAX_DEPTH)
+				return -1;
+			pos = align4(pos + len + 1);
+			depth++;
+			/* Cell sizes are not inherited: the defaults apply until the node says. */
+			node[depth] = (struct fdt_node_state){
+			    .addr_cells = FDT_DEFAULT_ADDR_CELLS,
+			    .size_cells = FDT_DEFAULT_SIZE_CELLS,
+			    .enabled = true,
+			};
+			break;
+		}
+		case FDT_END_NODE: {
+			if (depth == 0)
+				return -1;
+			const struct fdt_node_state *n = &node[depth];
+			const struct fdt_node_state *p = &node[depth - 1];
+
+			if (n->match && n->enabled && n->reg &&
+			    n->reg_len >= (p->addr_cells + p->size_cells) * CELL_SIZE) {
+				struct fdt_device tmp;
+
+				if (!fill_device(n, p, count < max ? &out[count] : &tmp))
+					return -1;
+				count++;
+			}
+			depth--;
+			break;
+		}
+		case FDT_PROP: {
+			if (pos + 2 * CELL_SIZE > total)
+				return -1;
+			u32 len = be32(b + pos);
+			u32 nameoff = be32(b + pos + CELL_SIZE);
+			const u8 *value = b + pos + 2 * CELL_SIZE;
+			struct fdt_node_state *n = &node[depth];
+
+			if (depth == 0 || strings + nameoff >= total ||
+			    pos + 2 * CELL_SIZE + len > total)
+				return -1;
+			const char *pname = (const char *)(b + strings + nameoff);
+
+			if (len == CELL_SIZE && str_eq(pname, "#address-cells"))
+				n->addr_cells = be32(value);
+			else if (len == CELL_SIZE && str_eq(pname, "#size-cells"))
+				n->size_cells = be32(value);
+			else if (str_eq(pname, "compatible"))
+				n->match = stringlist_has(value, len, compat);
+			else if (str_eq(pname, "status"))
+				n->enabled = stringlist_has(value, len, "okay") ||
+					     stringlist_has(value, len, "ok");
+			else if (str_eq(pname, "reg")) {
+				n->reg = value;
+				n->reg_len = len;
+			} else if (str_eq(pname, "interrupts")) {
+				n->irq = value;
+				n->irq_len = len;
+			}
+			pos = align4(pos + 2 * CELL_SIZE + len);
+			break;
+		}
+		case FDT_NOP:
+			break;
+		case FDT_END:
+			return depth == 0 ? count : -1;
+		default:
+			return -1;
+		}
 	}
 }

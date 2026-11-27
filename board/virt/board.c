@@ -11,7 +11,10 @@
 #include "drivers/arm_gtimer.h"
 #include "drivers/gicv2.h"
 #include "drivers/pl011.h"
+#include "drivers/virtio.h"
 #include "hal.h"
+#include "lib/fdt.h"
+#include "lib/kprintf.h"
 
 #define CONSOLE_BAUD 115200u
 
@@ -49,6 +52,70 @@ int hal_mmio_ranges(const struct hal_mmio_range **ranges)
 {
 	*ranges = mmio_ranges;
 	return (int)ARRAY_SIZE(mmio_ranges);
+}
+
+/* The disk, if QEMU was given one; used by the block layer later in Phase 5. */
+static struct virtio_blk disk;
+static bool have_disk;
+
+/* GIC interrupt number for a device's Device Tree interrupt specifier; 0 if none. */
+static u32 dt_irq(const struct fdt_device *d)
+{
+	if (d->irq_cells < 2)
+		return 0;
+	if (d->irq[0] == BOARD_DT_IRQ_SPI)
+		return BOARD_GIC_FIRST_SPI + d->irq[1];
+	if (d->irq[0] == BOARD_DT_IRQ_PPI)
+		return BOARD_GIC_FIRST_PPI + d->irq[1];
+	return 0;
+}
+
+/* True if [base, base + size) lies inside the device range the MMU maps. */
+static bool in_mmio(u64 base, u64 size)
+{
+	return base >= BOARD_MMIO_BASE && size <= BOARD_MMIO_SIZE &&
+	       base - BOARD_MMIO_BASE <= BOARD_MMIO_SIZE - size;
+}
+
+void hal_devices_init(uptr dtb)
+{
+	struct fdt_device dev[BOARD_VIRTIO_MAX];
+	int n =
+	    dtb ? fdt_find_compatible((const void *)dtb, "virtio,mmio", dev, BOARD_VIRTIO_MAX) : 0;
+
+	if (n < 0) {
+		kprintf("virtio: Device Tree unreadable, no devices\n");
+		return;
+	}
+	if (n > BOARD_VIRTIO_MAX)
+		n = BOARD_VIRTIO_MAX;
+
+	int used = 0;
+
+	for (int i = 0; i < n; i++) {
+		/* Never touch an address the Device Tree claims but the MMU does not map. */
+		if (!in_mmio(dev[i].base, dev[i].size))
+			continue;
+
+		struct virtio_blk blk;
+		int id = virtio_mmio_probe((uptr)dev[i].base, dt_irq(&dev[i]), &blk);
+
+		if (id <= (int)VIRTIO_ID_NONE)
+			continue;
+		used++;
+		if (id == (int)VIRTIO_ID_BLOCK && !have_disk) {
+			disk = blk;
+			have_disk = true;
+			kprintf(
+			    "Disk:   virtio block device at %p, irq %u, %lu sectors (%lu KiB)%s\n",
+			    (void *)disk.base, disk.irq, (unsigned long)disk.sectors,
+			    (unsigned long)(disk.sectors * VIRTIO_BLK_SECTOR_SIZE / 1024),
+			    disk.read_only ? ", read-only" : "");
+		}
+	}
+	kprintf("virtio: %d slots, %d in use\n", n, used);
+	if (!have_disk)
+		kprintf("Disk:   none\n");
 }
 
 const char *hal_board_name(void)

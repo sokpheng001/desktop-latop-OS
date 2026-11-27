@@ -73,11 +73,16 @@ board_pages() {
     esac
 }
 
-# Lines every kernel must print; the kernel must always end up at EL1.
+# Lines every kernel must print; the kernel must always end up at EL1. virt also
+# boots with the 1 MiB test disk from the Makefile and must find it.
 common_expect() {
     printf '%s\n' "Board:  $(board_name "$1")" "EL:     1" "$(board_ram "$1")" \
         "$(board_pages "$1")" "MMU:    on, caches on" "Hello from OS-001!" \
         "Timer:  100 Hz tick"
+    if [ "$1" = virt ]; then
+        printf '%s\n' "Disk:   virtio block device at 0x" "2048 sectors (1024 KiB)" \
+            "virtio: 32 slots, 1 in use"
+    fi
 }
 
 for run in $RUNS; do
@@ -190,7 +195,10 @@ for run in $RUNS; do
 
     # Raw images: QEMU follows the arm64 boot protocol and passes the Device Tree in x0.
     case "$board" in
-    virt) qemu_args="-M virt$machine_opts -cpu cortex-a72 -m 1G -nic none -kernel $build_dir/kernel8.img" ;;
+    virt) qemu_args="-M virt$machine_opts -cpu cortex-a72 -m 1G -nic none -kernel $build_dir/kernel8.img
+              -global virtio-mmio.force-legacy=false
+              -drive if=none,format=raw,file=$build_dir/disk.img,id=disk0
+              -device virtio-blk-device,drive=disk0" ;;
     rpi4) qemu_args="-M raspi4b$machine_opts -kernel $build_dir/kernel8.img -dtb $build_dir/qemu.dtb" ;;
     *)
         echo "  FAIL    boot $run: unknown board '$board'"

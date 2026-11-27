@@ -4,4 +4,4 @@
 #
 # Drivers built into the virt board image.
 
-DRIVERS := pl011 gicv2 arm_gtimer
+DRIVERS := pl011 gicv2 arm_gtimer virtio

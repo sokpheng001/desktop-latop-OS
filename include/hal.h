@@ -54,6 +54,12 @@ struct hal_mmio_range {
 /* The board's device register ranges; returns how many entries *ranges points to. */
 int hal_mmio_ranges(const struct hal_mmio_range **ranges);
 
+/*
+ * Find and set up the board's other devices (storage and so on), using the Device Tree
+ * at dtb (0 if none). Called once, after the MMU, heap and threads are up.
+ */
+void hal_devices_init(uptr dtb);
+
 /* Short, stable board identifier, e.g. "qemu-virt" (shown at boot and in logs). */
 const char *hal_board_name(void);
 

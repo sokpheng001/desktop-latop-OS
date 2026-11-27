@@ -161,11 +161,30 @@ static void test_fdt(const char *path)
 	check(fdt_reserved_regions(fdt_buf, r, 1) == 2,
 	      "FAIL fdt_reserved_regions reports every entry even past max");
 
+	struct fdt_device dev[4];
+
+	count = fdt_find_compatible(fdt_buf, "virtio,mmio", dev, 4);
+	check(count == 2, "FAIL fdt_find_compatible count (expected 2: one disabled, one other)");
+	if (count == 2) {
+		check(dev[0].base == 0x0a000000 && dev[0].size == 0x200 && dev[0].irq_cells == 3 &&
+			  dev[0].irq[0] == 0 && dev[0].irq[1] == 0x10 && dev[0].irq[2] == 1,
+		      "FAIL fdt device 0 (root cells, three interrupt cells)");
+		check(dev[1].base == 0x1000 && dev[1].size == 0x200 && dev[1].irq_cells == 1 &&
+			  dev[1].irq[0] == 5,
+		      "FAIL fdt device 1 (bus cells, second compatible, has a child)");
+	}
+	check(fdt_find_compatible(fdt_buf, "virtio,mmio", dev, 1) == 2,
+	      "FAIL fdt_find_compatible reports every device even past max");
+	check(fdt_find_compatible(fdt_buf, "virtio", dev, 4) == 0,
+	      "FAIL fdt_find_compatible matches a prefix");
+
 	/* A damaged header must be rejected, not parsed. */
 	fdt_buf[0] ^= 0xff;
 	check(!fdt_valid(fdt_buf), "FAIL fdt_valid accepts a bad magic");
 	check(fdt_memory_regions(fdt_buf, r, 4) == -1, "FAIL fdt_memory_regions on bad magic");
 	check(fdt_reserved_regions(fdt_buf, r, 4) == -1, "FAIL fdt_reserved_regions on bad magic");
+	check(fdt_find_compatible(fdt_buf, "virtio,mmio", dev, 4) == -1,
+	      "FAIL fdt_find_compatible on bad magic");
 	fdt_buf[0] ^= 0xff;
 	check(!fdt_valid(NULL), "FAIL fdt_valid(NULL)");
 }

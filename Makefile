@@ -86,6 +86,13 @@ IMG  := $(BUILD_DIR)/kernel8.img
 # Boards QEMU cannot describe on its own ship a Device Tree source for QEMU runs.
 DTC       ?= dtc
 QEMU_DTS  := $(wildcard board/$(BOARD)/qemu.dts)
+
+# virt boots with a small test disk on a virtio block device: 2048 sectors of 512
+# bytes (1 MiB), zero-filled except for a signature line in sector 0.
+ifeq ($(BOARD),virt)
+DISK         := $(BUILD_DIR)/disk.img
+DISK_SECTORS := 2048
+endif
 QEMU_DTB  := $(if $(QEMU_DTS),$(BUILD_DIR)/qemu.dtb)
 
 # Files checked by format / check-format.
@@ -97,7 +104,10 @@ FMT_FILES := $(shell find arch board kernel drivers lib include tests \
 # ---------------------------------------------------------------------------
 # The raw image carries the arm64 image header, so QEMU passes the Device Tree in x0.
 ifeq ($(BOARD),virt)
-QEMU_ARGS := -M virt -cpu cortex-a72 -m 1G -nic none -nographic -kernel $(IMG)
+# force-legacy=false: QEMU's virtio-mmio devices use the modern (version 2) interface.
+QEMU_ARGS := -M virt -cpu cortex-a72 -m 1G -nic none -nographic -kernel $(IMG) \
+	     -global virtio-mmio.force-legacy=false \
+	     -drive if=none,format=raw,file=$(DISK),id=disk0 -device virtio-blk-device,drive=disk0
 else
 QEMU_ARGS := -M raspi4b -serial stdio -display none -kernel $(IMG) -dtb $(QEMU_DTB)
 endif
@@ -112,8 +122,14 @@ ifeq ($(strip $(SRCS)),)
 all:
 	@echo "No sources for BOARD=$(BOARD) yet; nothing to build."
 else
-all: $(IMG) $(QEMU_DTB)
+all: $(IMG) $(QEMU_DTB) $(DISK)
 endif
+
+$(BUILD_DIR)/disk.img:
+	$(call echo_cmd,DISK,$@)
+	$(Q)mkdir -p $(dir $@)
+	$(Q)dd if=/dev/zero of=$@ bs=512 count=$(DISK_SECTORS) 2>/dev/null
+	$(Q)printf 'OS-001 test disk\n' | dd of=$@ conv=notrunc 2>/dev/null
 
 $(BUILD_DIR)/qemu.dtb: $(QEMU_DTS)
 	$(call echo_cmd,DTC,$@)

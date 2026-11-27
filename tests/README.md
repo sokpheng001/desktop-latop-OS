@@ -28,7 +28,7 @@ from `board/rpi4/qemu.dts` for the Pi (QEMU fills in the memory node). Self-test
 
 | Run | What it proves |
 |---|---|
-| `virt`, `rpi4` | Normal boot on both boards; console, GIC and timer come up |
+| `virt`, `rpi4` | Normal boot on both boards; console, GIC and timer come up; `virt` (every run) must find its 1 MiB virtio test disk |
 | `virt-el2` | `virt` with virtualization: entered at EL2, the kernel drops to EL1 (the Pi is always entered at EL2) |
 | `virt-fault`, `rpi4-fault` | A breakpoint reaches the exception vectors and is reported (EC `0x3c`) |
 | `virt-abort`, `rpi4-abort` | With the MMU on, a load from an unmapped address is reported as a data abort, level 1 translation fault, with FAR = that address |

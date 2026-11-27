@@ -6,7 +6,9 @@
  * Device Tree used by tests/lib_test.c to check lib/fdt.c: 64-bit addresses and
  * sizes, a memory node with two ranges, a second memory node found only by its
  * device_type, nested reg properties that must not be taken as RAM, and two
- * memory reservation block entries.
+ * memory reservation block entries. For device lookup: virtio,mmio nodes at the root,
+ * one disabled, one on a bus with 32-bit cells, listed second in its compatible
+ * property and with a child node of its own.
  */
 
 /dts-v1/;
@@ -41,6 +43,38 @@
 	soc {
 		serial@fe201000 {
 			reg = <0x0 0xfe201000 0x0 0x200>;
+		};
+	};
+
+	virtio_mmio@a000000 {
+		compatible = "virtio,mmio";
+		reg = <0x0 0x0a000000 0x0 0x200>;
+		interrupts = <0x0 0x10 0x1>;
+	};
+
+	virtio_mmio@a000200 {
+		compatible = "virtio,mmio";
+		reg = <0x0 0x0a000200 0x0 0x200>;
+		status = "disabled";
+	};
+
+	bus {
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		virtio@1000 {
+			compatible = "vendor,thing", "virtio,mmio";
+			reg = <0x1000 0x200>;
+			interrupts = <0x5>;
+
+			child {
+				compatible = "vendor,child";
+			};
+		};
+
+		other@2000 {
+			compatible = "virtio,mmio-not";
+			reg = <0x2000 0x200>;
 		};
 	};
 };

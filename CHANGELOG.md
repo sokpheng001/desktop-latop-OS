@@ -13,8 +13,16 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- Device lookup in the Device Tree: `fdt_find_compatible` returns every enabled node with a given `compatible` string, with its first `reg` range (read with its parent's cell sizes) and interrupt cells
+- virtio-mmio driver (`drivers/virtio/`, from OASIS virtio 1.2, section 4.2): checks each slot's magic and version (only the modern interface), resets a block device, negotiates features (`VERSION_1`, read-only flag) and reads its capacity
+- `hal_devices_init`: each board sets up its other devices after the kernel core is up. `virt` finds its 32 virtio slots in the Device Tree and reports the disk (`Disk:   virtio block device at ..., irq 79, 2048 sectors (1024 KiB)`), skipping any slot outside the mapped device range; `rpi4` has none yet
+- `make run` and the boot tests give `virt` a 1 MiB test disk (`build/virt/disk.img`, made by the Makefile); every `virt` boot run checks it is found
+- Host tests for device lookup: a disabled node, a second compatible string, a bus with 32-bit cells, a device with a child node, and a prefix that must not match
+
 ### Changed
 - Version string set to `0.5.0-dev` for Phase 5 work
+- QEMU `virt` runs use the modern virtio-mmio interface (`-global virtio-mmio.force-legacy=false`)
 
 ### Planned
 - Phase 5 (v0.5.0): virtio-blk driver (`virt`), SD card driver (`rpi4`), FAT32 read support and loading a program from disk

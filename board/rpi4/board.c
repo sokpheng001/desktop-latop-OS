@@ -94,6 +94,12 @@ int hal_mmio_ranges(const struct hal_mmio_range **ranges)
 	return (int)ARRAY_SIZE(mmio_ranges);
 }
 
+void hal_devices_init(uptr dtb)
+{
+	/* No storage driver yet: the SD card controller comes next in Phase 5. */
+	(void)dtb;
+}
+
 const char *hal_board_name(void)
 {
 	return BOARD_NAME;

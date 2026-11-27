@@ -42,6 +42,7 @@ void kernel_main(uptr dtb)
 	vm_init();
 	heap_init();
 	thread_init();
+	hal_devices_init(dtb);
 	kprintf("Hello from OS-001!\n");
 
 	/* Each source is still disabled at the controller until a driver registers it. */

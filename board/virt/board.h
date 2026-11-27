@@ -35,4 +35,17 @@
  */
 #define BOARD_TIMER_IRQ 30u
 
+/* QEMU virt has 32 virtio-mmio slots (nodes /virtio_mmio@a000000 and up). */
+#define BOARD_VIRTIO_MAX 32
+
+/*
+ * GIC interrupt specifiers in the Device Tree are <type number flags> (Linux kernel
+ * binding "arm,gic", Documentation/devicetree/bindings/interrupt-controller): type 0
+ * is an SPI, numbered from interrupt 32; type 1 a PPI, numbered from 16.
+ */
+#define BOARD_DT_IRQ_SPI    0u
+#define BOARD_DT_IRQ_PPI    1u
+#define BOARD_GIC_FIRST_SPI 32u
+#define BOARD_GIC_FIRST_PPI 16u
+
 #endif /* OS001_BOARD_H */

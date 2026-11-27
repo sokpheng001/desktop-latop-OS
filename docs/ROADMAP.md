@@ -47,7 +47,8 @@ Coarse items (later phases) are split into small steps before work on them start
 - [x] Message-passing IPC between processes
 
 ## Phase 5 — Storage (v0.5.0)
-- [ ] virtio-blk driver (`virt`)
+- [x] virtio devices found through the Device Tree; the block device identified, its size read and features negotiated (`virt`)
+- [ ] virtio-blk: read and write sectors through a virtqueue (`virt`)
 - [ ] SD card driver (`rpi4`)
 - [ ] FAT32 read support; load a program from disk
 
