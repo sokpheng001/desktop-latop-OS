@@ -13,6 +13,16 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Planned
+- Phase 5 (v0.5.0): virtio-blk driver (`virt`), SD card driver (`rpi4`), FAT32 read support and loading a program from disk
+
+## [0.4.0] - 2026-11-27
+
+Processes and permissions: the kernel runs preemptively scheduled threads and user programs at
+EL0, each in its own address space, reaching the kernel only through system calls. Every program
+holds a set of permissions the kernel checks and can only give up, and programs talk to each
+other by synchronous message passing.
+
 ### Added
 - Progress report for 2026-11-26 (`docs/progress/2026-11-26.md`)
 - Kernel threads (`kernel/thread.c`): `thread_create`, `thread_yield`, `thread_exit` with a FIFO run queue; the boot code becomes thread 0 ("main"); each thread gets a 16 KB stack from the heap, freed after it exits. Threads can also give up the CPU early with `thread_yield`
@@ -34,14 +44,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `virt-thread` / `rpi4-thread` boot runs: three threads must run in turn (ABCABCABC), keep their registers across switches and be freed on exit
 
 ### Changed
-- Version string set to `0.4.0-dev` for Phase 4 work
 - `user_syscall` takes the saved argument registers, so a system call can return more than one value
 
 ### Fixed
 - Assembly files now see `-DKERNEL_TEST_<name>` like C files (`ASFLAGS` follows `CFLAGS`)
-
-### Planned
-- Phase 4 (v0.4.0): kernel threads and context switch, round-robin scheduler, user mode and system calls, per-process permissions, message-passing IPC
 
 ## [0.3.0] - 2026-11-26
 
@@ -140,7 +146,8 @@ First boot: OS-001 boots on QEMU `virt` and Raspberry Pi 4 (`raspi4b`) and print
 - `README.md`, `AUTHORS`, `.gitignore`
 - This changelog
 
-[Unreleased]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sokpheng001/desktop-latop-OS/compare/v0.0.1...v0.1.0

@@ -10,6 +10,6 @@
 #define OS001_VERSION_H
 
 #define OS001_NAME    "OS-001"
-#define OS001_VERSION "0.4.0-dev"
+#define OS001_VERSION "0.4.0"
 
 #endif /* OS001_VERSION_H */
