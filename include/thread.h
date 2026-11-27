@@ -25,6 +25,7 @@
 enum thread_state {
 	THREAD_RUNNING,
 	THREAD_READY,
+	THREAD_BLOCKED, /* waiting for thread_wake; on no queue */
 	THREAD_DEAD,
 };
 
@@ -56,6 +57,16 @@ struct thread *thread_create_user(const char *name, void (*entry)(void *), void 
 /* Let the next ready thread run; returns when this thread's turn comes round again. */
 void thread_yield(void);
 
+/*
+ * Stop running until another thread calls thread_wake on this one. The caller masks
+ * IRQs (arch_irq_save) around checking its wait condition and calling this, so a wake
+ * cannot slip in between. Not for thread 0, which must always be able to run.
+ */
+void thread_block(void);
+
+/* Make a blocked thread ready again (queued last); does nothing if it is not blocked. */
+void thread_wake(struct thread *t);
+
 /* End the calling thread; its stack is freed once another thread runs. Not for thread 0. */
 void thread_exit(void) ATTR_NORETURN;
 
@@ -71,7 +82,7 @@ void thread_preempt(void);
 
 struct thread *thread_current(void);
 
-/* Threads alive: running, ready or not yet reaped. */
+/* Threads alive: running, ready, blocked or not yet reaped. */
 usize thread_count(void);
 
 #endif /* !__ASSEMBLY__ */

@@ -107,8 +107,7 @@ void arch_exception_handler(struct exc_frame *frame, u64 kind)
 	if (kind == EXC_GROUP_LOWER_A64 * EXC_TYPES_PER_GROUP + EXC_TYPE_SYNC) {
 		if (ec == EC_SVC64) {
 			/* ELR already points past the svc instruction. */
-			frame->x[0] =
-			    (u64)user_syscall(frame->x[8], frame->x[0], frame->x[1], frame->x[2]);
+			frame->x[0] = (u64)user_syscall(frame->x[8], frame->x);
 			return;
 		}
 		user_kill(ec_is_abort(ec) ? lookup(fsc_names, ARRAY_SIZE(fsc_names),

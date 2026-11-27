@@ -11,6 +11,7 @@
 #define OS001_USER_H
 
 #include "compiler.h"
+#include "ipc.h"
 #include "types.h"
 
 #ifndef __ASSEMBLY__
@@ -26,7 +27,10 @@
 #define USER_MAX_PAGES	 4u		/* code pages per program */
 #define USER_EXIT_KILLED (-1)
 
+struct thread;
+
 struct user_proc {
+	u32 pid; /* unique id, never reused; programs address messages to it */
 	u32 asid;
 	uptr space;
 	u32 code_pages;
@@ -34,8 +38,17 @@ struct user_proc {
 	uptr stack_pa;
 	u64 arg;   /* passed to the program in x0 */
 	u32 perms; /* PERM_* bits the program holds (perm.h) */
+	struct thread *thread;
 	int exit_code;
 	bool exited;
+
+	/* Message passing (kernel/ipc.c). */
+	bool ipc_receiving;	       /* blocked in recv, waiting for a sender */
+	u32 ipc_from;		       /* sender of the message just received */
+	u64 ipc_msg[IPC_WORDS];	       /* outgoing while sending, incoming while receiving */
+	long ipc_result;	       /* outcome for a sender that was queued */
+	struct user_proc *ipc_senders; /* programs waiting for this one to receive */
+	struct user_proc *ipc_next;    /* link in the receiver's ipc_senders queue */
 };
 
 /*
@@ -49,8 +62,14 @@ struct user_proc *user_spawn(const char *name, const void *code, usize size, u64
 /* Release a finished program's bookkeeping (its pages were freed when it ended). */
 void user_release(struct user_proc *p);
 
-/* System call from the running user program: number nr, arguments a0-a2. */
-long user_syscall(u64 nr, u64 a0, u64 a1, u64 a2);
+/*
+ * System call from the running user program: number nr, argument registers regs[0..5]
+ * (x0-x5). Returns the result for x0; calls with more results also overwrite regs[1..].
+ */
+long user_syscall(u64 nr, u64 *regs);
+
+/* The running program with id pid, or NULL if there is none (or it is ending). */
+struct user_proc *user_find(u64 pid);
 
 /* The running user program caused an exception: report it and end the program only. */
 void user_kill(const char *what, uptr pc, uptr addr) ATTR_NORETURN;

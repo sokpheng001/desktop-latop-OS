@@ -163,6 +163,122 @@ perm_fail_msg:	.ascii "[user] printed after giving up the console\n"
 	.balign 4
 user_perm_end:
 
+/*
+ * Message passing. The server answers arg requests: each reply goes back to the
+ * sender the kernel named and carries the first word plus one and the second word
+ * unchanged. It also checks that a send to itself and to pid 0 are refused, then
+ * exits with the number of requests answered (else 100 + the failed check).
+ */
+	.global user_server_start, user_server_end
+user_server_start:
+	mov	x19, x0
+	mov	x20, #0
+1:	cmp	x20, x19
+	b.eq	2f
+	sys	SYS_RECV
+	add	x1, x1, #1
+	sys	SYS_SEND
+	cbnz	x0, 8f
+	add	x20, x20, #1
+	b	1b
+2:	sys	SYS_GETPID
+	sys	SYS_SEND
+	cmn	x0, #SYS_EDEADLK
+	b.ne	9f
+	mov	x0, #0
+	sys	SYS_SEND
+	cmn	x0, #SYS_ESRCH
+	b.ne	9f
+	print	server_msg, server_len
+	mov	x0, x20
+	sys	SYS_EXIT
+8:	mov	x0, #101
+	sys	SYS_EXIT
+9:	mov	x0, #102
+	sys	SYS_EXIT
+	brk	#0
+
+server_msg:	.ascii "[user] server answered every request\n"
+	.equ	server_len, . - server_msg
+	.balign 4
+user_server_end:
+
+/*
+ * Client: sends three requests (i, own pid) to the server whose pid is arg, and checks
+ * each reply comes from the server and carries (i + 1, own pid), so replies never go
+ * to the wrong client. Exits 5, else the number of the failed check.
+ */
+	.global user_client_start, user_client_end
+user_client_start:
+	mov	x19, x0
+	sys	SYS_GETPID
+	mov	x21, x0
+	mov	x20, #1
+1:	mov	x0, x19
+	mov	x1, x20
+	mov	x2, x21
+	sys	SYS_SEND
+	cbnz	x0, 7f
+	sys	SYS_RECV
+	cmp	x0, x19
+	b.ne	8f
+	add	x3, x20, #1
+	cmp	x1, x3
+	b.ne	9f
+	cmp	x2, x21
+	b.ne	9f
+	add	x20, x20, #1
+	cmp	x20, #3
+	b.ls	1b
+	print	client_msg, client_len
+	mov	x0, #5
+	sys	SYS_EXIT
+7:	mov	x0, #1
+	sys	SYS_EXIT
+8:	mov	x0, #2
+	sys	SYS_EXIT
+9:	mov	x0, #3
+	sys	SYS_EXIT
+	brk	#0
+
+client_msg:	.ascii "[user] client got every reply\n"
+	.equ	client_len, . - client_msg
+	.balign 4
+user_client_end:
+
+/* Yields a few times without ever receiving, then exits 0. */
+	.global user_quitter_start, user_quitter_end
+user_quitter_start:
+	mov	x19, #5
+1:	sys	SYS_YIELD
+	subs	x19, x19, #1
+	b.ne	1b
+	mov	x0, #0
+	sys	SYS_EXIT
+	brk	#0
+	.balign 4
+user_quitter_end:
+
+/* Sends to the quitter (pid in arg), which never receives: must fail, exit 6. */
+	.global user_lonely_start, user_lonely_end
+user_lonely_start:
+	mov	x1, #1
+	mov	x2, #2
+	sys	SYS_SEND
+	cmn	x0, #SYS_ESRCH
+	b.ne	1f
+	print	lonely_msg, lonely_len
+	mov	x0, #6
+	sys	SYS_EXIT
+1:	mov	x0, #1
+	sys	SYS_EXIT
+	brk	#0
+
+lonely_msg:	.ascii "[user] send to an ended program failed\n"
+	.equ	lonely_len, . - lonely_msg
+	.balign 4
+user_lonely_end:
+
 /* Tries to read kernel memory (the kernel image): must be killed. */
 	.global user_peek_start, user_peek_end
 user_peek_start:

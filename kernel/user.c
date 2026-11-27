@@ -13,6 +13,7 @@
 #include "arch.h"
 #include "console.h"
 #include "heap.h"
+#include "ipc.h"
 #include "lib/kprintf.h"
 #include "perm.h"
 #include "pmm.h"
@@ -22,6 +23,17 @@
 
 /* ASIDs in use; index 0 stands for ASID 1. */
 static bool asid_used[USER_MAX_PROCS];
+/* Running programs that can be found by id, by ASID; NULL once a program is ending. */
+static struct user_proc *procs[USER_MAX_PROCS];
+static u32 next_pid = 1;
+
+struct user_proc *user_find(u64 pid)
+{
+	for (u32 i = 0; pid && i < USER_MAX_PROCS; i++)
+		if (procs[i] && procs[i]->pid == pid)
+			return procs[i];
+	return NULL;
+}
 
 static uptr stack_va(void)
 {
@@ -48,8 +60,10 @@ static void free_process(struct user_proc *p)
 		arch_mmu_space_destroy(p->space);
 		p->space = 0;
 	}
-	if (p->asid)
+	if (p->asid) {
+		procs[p->asid - 1] = NULL;
 		asid_used[p->asid - 1] = false;
+	}
 	p->asid = 0;
 }
 
@@ -57,6 +71,8 @@ static void user_thread(void *arg)
 {
 	struct user_proc *p = arg;
 
+	/* Set here, before the program can send or receive, so IPC can always wake it. */
+	p->thread = thread_current();
 	arch_enter_user(USER_BASE, USER_BASE + USER_SIZE, p->arg);
 }
 
@@ -110,7 +126,16 @@ struct user_proc *user_spawn(const char *name, const void *code, usize size, u64
 		ok = ok && arch_mmu_map_user(p->space, stack_va(), (uptr)stack, ARCH_USER_DATA);
 	}
 
-	if (!ok || !thread_create_user(name, user_thread, p, p, p->space)) {
+	/* IRQs masked: the program becomes findable only once its thread exists, and
+	 * before that thread can run (and end). */
+	unsigned long flags = arch_irq_save();
+
+	p->pid = next_pid++;
+	ok = ok && thread_create_user(name, user_thread, p, p, p->space);
+	if (ok)
+		procs[p->asid - 1] = p;
+	arch_irq_restore(flags);
+	if (!ok) {
 		free_process(p);
 		kfree(p);
 		return NULL;
@@ -134,6 +159,9 @@ static void user_end(int code)
 	/* Leave p's space before freeing it; kernel code and stack are mapped in every space. */
 	unsigned long flags = arch_irq_save();
 
+	/* No longer findable, and nobody may stay queued waiting to send to it. */
+	procs[p->asid - 1] = NULL;
+	ipc_exit(p);
 	t->space = 0;
 	arch_mmu_switch(0);
 	arch_irq_restore(flags);
@@ -169,11 +197,11 @@ static bool user_may(const struct user_proc *p, u32 perm)
 	return false;
 }
 
-long user_syscall(u64 nr, u64 a0, u64 a1, u64 a2)
+long user_syscall(u64 nr, u64 *regs)
 {
 	struct user_proc *p = thread_current()->user;
+	u64 a0 = regs[0], a1 = regs[1];
 
-	(void)a2;
 	switch (nr) {
 	case SYS_WRITE:
 		if (!user_may(p, PERM_CONSOLE))
@@ -193,6 +221,12 @@ long user_syscall(u64 nr, u64 a0, u64 a1, u64 a2)
 		/* Only ever clears bits: there is no call that sets one. */
 		p->perms &= ~(u32)a0;
 		return (long)p->perms;
+	case SYS_SEND:
+		return ipc_send(p, a0, &regs[1]);
+	case SYS_RECV:
+		return ipc_recv(p, &regs[1]);
+	case SYS_GETPID:
+		return (long)p->pid;
 	default:
 		return -SYS_ENOSYS;
 	}

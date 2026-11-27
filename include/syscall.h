@@ -24,10 +24,21 @@
 #define SYS_PERM_GET  3
 /* perm_drop(set): give up the permissions in set for good; returns what is left. */
 #define SYS_PERM_DROP 4
+/*
+ * send(pid, w0, w1): send a two-word message to program pid and wait until it is
+ * received; returns 0 (ipc.h).
+ */
+#define SYS_SEND      5
+/* recv(): wait for a message; returns the sender's pid in x0 and the words in x1-x2. */
+#define SYS_RECV      6
+/* getpid(): the caller's own id (above 0, never reused). */
+#define SYS_GETPID    7
 
 /* Errors, returned negated. */
-#define SYS_EPERM  1  /* the caller does not hold the permission */
-#define SYS_EFAULT 14 /* a pointer outside the caller's own memory */
-#define SYS_ENOSYS 38 /* no such system call */
+#define SYS_EPERM   1  /* the caller does not hold the permission */
+#define SYS_ESRCH   3  /* no such program, or it ended */
+#define SYS_EFAULT  14 /* a pointer outside the caller's own memory */
+#define SYS_EDEADLK 35 /* a message to itself: it could never be received */
+#define SYS_ENOSYS  38 /* no such system call */
 
 #endif /* OS001_SYSCALL_H */

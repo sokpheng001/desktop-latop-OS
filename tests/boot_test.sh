@@ -32,7 +32,9 @@
 #          system calls; bad pointers and unknown calls are refused; programs that
 #          write their own code or read kernel memory are killed, the kernel lives on;
 #          two copies of one program at the same addresses keep separate memory;
-#          a program that gave up the console permission is refused printing
+#          a program that gave up the console permission is refused printing;
+#          a server answers two clients by message and a send to a program that
+#          ends without receiving fails
 #   pmm    self-test kernel (make KERNEL_TEST=pmm): every free page must be handed out
 #          once, written, and returned; double and misaligned frees are refused
 
@@ -164,6 +166,9 @@ for run in $RUNS; do
             "[user] twin kept its own memory" \
             "[user] holding the console permission only" \
             "(perm) denied console" \
+            "[user] server answered every request" \
+            "[user] client got every reply" \
+            "[user] send to an ended program failed" \
             "Self-test: user mode OK")
         ;;
     heap)

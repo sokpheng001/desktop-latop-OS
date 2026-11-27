@@ -133,15 +133,23 @@ extern const char user_bad_start[], user_bad_end[];
 extern const char user_peek_start[], user_peek_end[];
 extern const char user_twin_start[], user_twin_end[];
 extern const char user_perm_start[], user_perm_end[];
+extern const char user_server_start[], user_server_end[];
+extern const char user_client_start[], user_client_end[];
+extern const char user_quitter_start[], user_quitter_end[];
+extern const char user_lonely_start[], user_lonely_end[];
 extern const char user_peek_addr_offset[]; /* an offset, not an address */
 extern char kernel_start[];
 
-#define SELFTEST_USER_EXIT  7
-#define SELFTEST_TWIN_A	    11u
-#define SELFTEST_TWIN_B	    22u
-#define SELFTEST_PERM_EXIT  9
+#define SELFTEST_USER_EXIT	 7
+#define SELFTEST_TWIN_A		 11u
+#define SELFTEST_TWIN_B		 22u
+#define SELFTEST_PERM_EXIT	 9
+#define SELFTEST_CLIENTS	 2u
+#define SELFTEST_CLIENT_REQUESTS 3u
+#define SELFTEST_CLIENT_EXIT	 5
+#define SELFTEST_LONELY_EXIT	 6
 /* A bit outside PERM_ALL: user_spawn must ignore it. */
-#define SELFTEST_PERM_BOGUS (1u << 31)
+#define SELFTEST_PERM_BOGUS	 (1u << 31)
 
 /* Run the three programs to the end; true if each ended the way it must. */
 static bool user_round(void)
@@ -171,6 +179,29 @@ static bool user_round(void)
 		       PERM_CONSOLE | SELFTEST_PERM_BOGUS);
 	bool ok = hello && bad && snoop && twin_a && twin_b && perm;
 
+	/* Message passing: a server with two clients, and a send to a program that quits. */
+	struct user_proc *server =
+	    user_spawn("server", user_server_start, (usize)(user_server_end - user_server_start),
+		       SELFTEST_CLIENTS * SELFTEST_CLIENT_REQUESTS, PERM_CONSOLE);
+	struct user_proc *client[SELFTEST_CLIENTS] = {NULL};
+	usize client_size = (usize)(user_client_end - user_client_start);
+
+	for (u32 i = 0; server && i < SELFTEST_CLIENTS; i++)
+		client[i] =
+		    user_spawn("client", user_client_start, client_size, server->pid, PERM_CONSOLE);
+	struct user_proc *quitter =
+	    user_spawn("quitter", user_quitter_start,
+		       (usize)(user_quitter_end - user_quitter_start), 0, PERM_CONSOLE);
+	struct user_proc *lonely = quitter
+				       ? user_spawn("lonely", user_lonely_start,
+						    (usize)(user_lonely_end - user_lonely_start),
+						    quitter->pid, PERM_CONSOLE)
+				       : NULL;
+
+	ok = ok && server && quitter && lonely;
+	for (u32 i = 0; i < SELFTEST_CLIENTS; i++)
+		ok = ok && client[i];
+
 	for (u32 spins = 0; ok && thread_count() > 1 && spins < 1000; spins++)
 		thread_yield();
 	ok = ok && thread_count() == 1 && hello->exited && hello->exit_code == SELFTEST_USER_EXIT &&
@@ -178,7 +209,12 @@ static bool user_round(void)
 	     snoop->exit_code == USER_EXIT_KILLED && twin_a->exited &&
 	     twin_a->exit_code == SELFTEST_TWIN_A && twin_b->exited &&
 	     twin_b->exit_code == SELFTEST_TWIN_B && perm->exited &&
-	     perm->exit_code == SELFTEST_PERM_EXIT;
+	     perm->exit_code == SELFTEST_PERM_EXIT && server->exited &&
+	     server->exit_code == (int)(SELFTEST_CLIENTS * SELFTEST_CLIENT_REQUESTS) &&
+	     quitter->exited && quitter->exit_code == 0 && lonely->exited &&
+	     lonely->exit_code == SELFTEST_LONELY_EXIT;
+	for (u32 i = 0; ok && i < SELFTEST_CLIENTS; i++)
+		ok = client[i]->exited && client[i]->exit_code == SELFTEST_CLIENT_EXIT;
 	if (hello)
 		user_release(hello);
 	if (bad)
@@ -191,6 +227,15 @@ static bool user_round(void)
 		user_release(twin_b);
 	if (perm)
 		user_release(perm);
+	if (server)
+		user_release(server);
+	for (u32 i = 0; i < SELFTEST_CLIENTS; i++)
+		if (client[i])
+			user_release(client[i]);
+	if (quitter)
+		user_release(quitter);
+	if (lonely)
+		user_release(lonely);
 	kfree(peek);
 	return ok;
 }
@@ -215,7 +260,7 @@ static void selftest_user(void)
 	ok = ok && pages_not_lost() == free0 && heap_live_count() == live0;
 	if (ok)
 		kprintf("Self-test: user mode OK (exit code %d, two programs killed, twins kept "
-			"separate memory, permissions enforced, no leaks)\n",
+			"separate memory, permissions enforced, messages delivered, no leaks)\n",
 			SELFTEST_USER_EXIT);
 	else
 		kprintf("Self-test: user mode FAILED (free %lu -> %lu, alive=%lu)\n",

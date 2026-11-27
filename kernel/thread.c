@@ -152,6 +152,36 @@ void thread_yield(void)
 	arch_irq_restore(flags);
 }
 
+void thread_block(void)
+{
+	unsigned long flags = arch_irq_save();
+
+	if (current == &boot_thread) {
+		kprintf("thread: the main thread cannot block\n");
+		arch_halt();
+	}
+
+	/* Thread 0 never blocks, so it is ready whenever another thread runs. */
+	struct thread *next = ready_pop();
+
+	if (!next) {
+		kprintf("thread: no thread left to run\n");
+		arch_halt();
+	}
+	current->state = THREAD_BLOCKED;
+	switch_to(next);
+	arch_irq_restore(flags);
+}
+
+void thread_wake(struct thread *t)
+{
+	unsigned long flags = arch_irq_save();
+
+	if (t->state == THREAD_BLOCKED)
+		ready_push(t);
+	arch_irq_restore(flags);
+}
+
 void thread_exit(void)
 {
 	arch_irq_save();

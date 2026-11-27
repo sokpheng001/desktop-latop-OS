@@ -44,7 +44,7 @@ Coarse items (later phases) are split into small steps before work on them start
 - [x] User mode (EL0) and system calls: programs in their own pages, `write` / `yield` / `exit`, a faulting program is killed, not the kernel
 - [x] Per-process address spaces: each process gets its own page tables
 - [x] Per-process permission table checked by the kernel (privacy pillar)
-- [ ] Message-passing IPC between processes
+- [x] Message-passing IPC between processes
 
 ## Phase 5 — Storage (v0.5.0)
 - [ ] virtio-blk driver (`virt`)

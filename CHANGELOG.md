@@ -28,10 +28,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Per-process permissions (`include/perm.h`, `kernel/perm.c`): each program holds a set of permissions (console, files, network, camera, microphone) given when it is started (`user_spawn` now takes the set; unknown bits are ignored). `write` needs the console permission and returns `-EPERM` without it; every refusal is reported on the console (`perm: thread N (name) denied console`)
 - System calls `perm_get` (3) and `perm_drop` (4): a program can give permissions up for good but never gain one back, following Capsicum's capability mode
 - The `virt-user` / `rpi4-user` boot runs also start a program with only the console permission (plus an unknown bit), which gives it up, is refused printing, and cannot get it back
+- Message passing between programs (`kernel/ipc.c`, `include/ipc.h`): synchronous `send(pid, w0, w1)` and `recv()` with two-word messages in registers, following L4 (Liedtke 1993): no kernel buffering, no allocation, no timeouts. The kernel stamps each message with the sender's id so it cannot be forged; senders queue first come, first served; a send to a program that ends before receiving fails with `-ESRCH`, a send to itself with `-EDEADLK`. Every program gets a unique id (`getpid`, system call 7)
+- Blocking threads: `thread_block` / `thread_wake`
+- The `virt-user` / `rpi4-user` boot runs also run a server that answers two clients by message (each reply must reach the right client) and a send to a program that ends without receiving
 - `virt-thread` / `rpi4-thread` boot runs: three threads must run in turn (ABCABCABC), keep their registers across switches and be freed on exit
 
 ### Changed
 - Version string set to `0.4.0-dev` for Phase 4 work
+- `user_syscall` takes the saved argument registers, so a system call can return more than one value
 
 ### Fixed
 - Assembly files now see `-DKERNEL_TEST_<name>` like C files (`ASFLAGS` follows `CFLAGS`)
