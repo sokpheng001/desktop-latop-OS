@@ -42,4 +42,12 @@
  */
 #define BOARD_TIMER_IRQ 30u
 
+/*
+ * SD host controllers (BCM2711 ARM Peripherals, "EMMC"): EMMC2 drives the SD card slot
+ * on the Pi 4; the older EMMC (Arasan) controller is tried too, since QEMU's raspi4b
+ * model has both.
+ */
+#define BOARD_EMMC2_BASE (BOARD_PERIPH_BASE + 0x340000ul)
+#define BOARD_EMMC_BASE	 (BOARD_PERIPH_BASE + 0x300000ul)
+
 #endif /* OS001_BOARD_H */

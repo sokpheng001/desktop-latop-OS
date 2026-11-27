@@ -17,10 +17,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Device lookup in the Device Tree: `fdt_find_compatible` returns every enabled node with a given `compatible` string, with its first `reg` range (read with its parent's cell sizes) and interrupt cells
 - virtio-mmio driver (`drivers/virtio/`, from OASIS virtio 1.2, section 4.2): checks each slot's magic and version (only the modern interface), resets a block device, negotiates features (`VERSION_1`, read-only flag) and reads its capacity
 - `hal_devices_init`: each board sets up its other devices after the kernel core is up. `virt` finds its 32 virtio slots in the Device Tree and reports the disk (`Disk:   virtio block device at ..., irq 79, 2048 sectors (1024 KiB)`), skipping any slot outside the mapped device range; `rpi4` has none yet
-- `make run` and the boot tests give `virt` a 1 MiB test disk (`build/virt/disk.img`, made by the Makefile); every `virt` boot run checks it is found
+- `make run` and the boot tests give both boards a 1 MiB test disk (`build/<board>/disk.img`, made by the Makefile): a virtio disk on `virt`, an SD card on `rpi4`; every boot run checks it is found
 - virtio-blk reads and writes (`virtio_blk_rw`): a split virtqueue of 8 entries in one page (spec 2.7), each request a chain of header, data and status (5.2.6), polled to completion; a request the device never answers marks the device failed
 - Block device layer (`include/block.h`, `kernel/block.c`): drivers register disks (`block_register`); `block_read` / `block_write` check ranges and read-only disks once for every driver. The `virt` disk is registered as `vda`
 - `virt-disk` boot run (`make KERNEL_TEST=disk`): reads the test disk's signature, writes three sectors at its end and reads them back, and checks out-of-range requests are refused
+- SD host controller driver (`drivers/sdhci/`, from the SD Association's simplified Host Controller and Physical Layer specifications): resets the controller, powers the bus, runs the 400 kHz identification clock and identifies the card (CMD0, CMD8, ACMD41, CMD2, CMD3, CMD9, CMD7), reading its capacity from either CSD version. Registers are accessed 32 bits at a time, as the BCM2711 requires
+- `rpi4` looks for an SD card on EMMC2 (the Pi 4's card slot) and then the older EMMC controller (where QEMU attaches it) and reports it (`Disk:   SD card (SDSC) at ..., 2048 sectors (1024 KiB)`)
 - Host tests for device lookup: a disabled node, a second compatible string, a bus with 32-bit cells, a device with a child node, and a prefix that must not match
 
 ### Changed

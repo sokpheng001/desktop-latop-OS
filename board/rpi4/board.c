@@ -12,7 +12,9 @@
 #include "drivers/arm_gtimer.h"
 #include "drivers/gicv2.h"
 #include "drivers/pl011.h"
+#include "drivers/sdhci.h"
 #include "hal.h"
+#include "lib/kprintf.h"
 #include "mmio.h"
 
 #define CONSOLE_BAUD 115200u
@@ -94,10 +96,26 @@ int hal_mmio_ranges(const struct hal_mmio_range **ranges)
 	return (int)ARRAY_SIZE(mmio_ranges);
 }
 
+/* The SD card, if one is inserted; block transfers come next in Phase 5. */
+static struct sdhci sd;
+
 void hal_devices_init(uptr dtb)
 {
-	/* No storage driver yet: the SD card controller comes next in Phase 5. */
+	/* The controllers sit at fixed addresses on the BCM2711: no Device Tree needed. */
+	static const uptr hosts[] = {BOARD_EMMC2_BASE, BOARD_EMMC_BASE};
+
 	(void)dtb;
+	for (usize i = 0; i < ARRAY_SIZE(hosts) && !sd.present; i++) {
+		sd.base = hosts[i];
+		sdhci_init(&sd);
+	}
+	if (sd.present)
+		kprintf("Disk:   SD card (%s) at %p, %lu sectors (%lu KiB)\n",
+			sd.high_cap ? "SDHC/SDXC" : "SDSC", (void *)sd.base,
+			(unsigned long)sd.blocks,
+			(unsigned long)(sd.blocks * SDHCI_BLOCK_SIZE / 1024));
+	else
+		kprintf("Disk:   none (no SD card found)\n");
 }
 
 const char *hal_board_name(void)

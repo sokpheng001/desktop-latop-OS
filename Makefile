@@ -87,12 +87,11 @@ IMG  := $(BUILD_DIR)/kernel8.img
 DTC       ?= dtc
 QEMU_DTS  := $(wildcard board/$(BOARD)/qemu.dts)
 
-# virt boots with a small test disk on a virtio block device: 2048 sectors of 512
-# bytes (1 MiB), zero-filled except for a signature line in sector 0.
-ifeq ($(BOARD),virt)
+# Both boards boot with a small test disk (a virtio block device on virt, an SD card
+# on rpi4): 2048 sectors of 512 bytes (1 MiB, a power of two as QEMU's SD card needs),
+# zero-filled except for a signature line in sector 0.
 DISK         := $(BUILD_DIR)/disk.img
 DISK_SECTORS := 2048
-endif
 QEMU_DTB  := $(if $(QEMU_DTS),$(BUILD_DIR)/qemu.dtb)
 
 # Files checked by format / check-format.
@@ -109,7 +108,8 @@ QEMU_ARGS := -M virt -cpu cortex-a72 -m 1G -nic none -nographic -kernel $(IMG) \
 	     -global virtio-mmio.force-legacy=false \
 	     -drive if=none,format=raw,file=$(DISK),id=disk0 -device virtio-blk-device,drive=disk0
 else
-QEMU_ARGS := -M raspi4b -serial stdio -display none -kernel $(IMG) -dtb $(QEMU_DTB)
+QEMU_ARGS := -M raspi4b -serial stdio -display none -kernel $(IMG) -dtb $(QEMU_DTB) \
+	     -drive if=sd,format=raw,file=$(DISK)
 endif
 
 # ---------------------------------------------------------------------------

@@ -4,4 +4,4 @@
 #
 # Drivers built into the rpi4 board image.
 
-DRIVERS := pl011 gicv2 arm_gtimer
+DRIVERS := pl011 gicv2 arm_gtimer sdhci

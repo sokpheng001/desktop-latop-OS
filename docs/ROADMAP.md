@@ -49,7 +49,8 @@ Coarse items (later phases) are split into small steps before work on them start
 ## Phase 5 — Storage (v0.5.0)
 - [x] virtio devices found through the Device Tree; the block device identified, its size read and features negotiated (`virt`)
 - [x] virtio-blk: read and write sectors through a virtqueue (`virt`)
-- [ ] SD card driver (`rpi4`)
+- [x] SD card found: host controller reset, card identified and its size read (`rpi4`)
+- [ ] SD card: read and write blocks, registered as a block device (`rpi4`)
 - [ ] FAT32 read support; load a program from disk
 
 ## Phase 6 — Screen and input (v0.6.0)
