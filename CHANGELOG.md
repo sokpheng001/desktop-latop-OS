@@ -18,6 +18,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - virtio-mmio driver (`drivers/virtio/`, from OASIS virtio 1.2, section 4.2): checks each slot's magic and version (only the modern interface), resets a block device, negotiates features (`VERSION_1`, read-only flag) and reads its capacity
 - `hal_devices_init`: each board sets up its other devices after the kernel core is up. `virt` finds its 32 virtio slots in the Device Tree and reports the disk (`Disk:   virtio block device at ..., irq 79, 2048 sectors (1024 KiB)`), skipping any slot outside the mapped device range; `rpi4` has none yet
 - `make run` and the boot tests give `virt` a 1 MiB test disk (`build/virt/disk.img`, made by the Makefile); every `virt` boot run checks it is found
+- virtio-blk reads and writes (`virtio_blk_rw`): a split virtqueue of 8 entries in one page (spec 2.7), each request a chain of header, data and status (5.2.6), polled to completion; a request the device never answers marks the device failed
+- Block device layer (`include/block.h`, `kernel/block.c`): drivers register disks (`block_register`); `block_read` / `block_write` check ranges and read-only disks once for every driver. The `virt` disk is registered as `vda`
+- `virt-disk` boot run (`make KERNEL_TEST=disk`): reads the test disk's signature, writes three sectors at its end and reads them back, and checks out-of-range requests are refused
 - Host tests for device lookup: a disabled node, a second compatible string, a bus with 32-bit cells, a device with a child node, and a prefix that must not match
 
 ### Changed

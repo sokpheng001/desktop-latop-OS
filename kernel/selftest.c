@@ -9,6 +9,7 @@
  */
 
 #include "arch.h"
+#include "block.h"
 #include "compiler.h"
 #include "hal.h"
 #include "heap.h"
@@ -123,6 +124,62 @@ static void selftest_thread(void)
 	else
 		kprintf("Self-test: threads FAILED (order %s, bad=%u, alive=%lu)\n", thread_log,
 			thread_bad, (unsigned long)thread_count());
+}
+#endif
+
+#if defined(KERNEL_TEST_DISK)
+/* First line of sector 0 of the test disk the Makefile builds. */
+#define SELFTEST_DISK_SIGNATURE "OS-001 test disk\n"
+#define SELFTEST_DISK_RUN	3u /* sectors written and read back in one request */
+
+/* Every byte of the run at the end of the disk: differs per sector and per offset. */
+static u8 disk_pattern(u64 sector, usize offset)
+{
+	return (u8)(sector * 31u + offset * 7u + 1u);
+}
+
+/*
+ * On the first disk: read the signature in sector 0, write a run of sectors at the
+ * end and read it back into a cleared buffer, then check out-of-range requests fail.
+ */
+static void selftest_disk(void)
+{
+	const struct block_dev *d = block_get(0);
+	u8 *buf = (u8 *)pmm_alloc_page();
+	const char *sig = SELFTEST_DISK_SIGNATURE;
+	bool ok = d && buf && d->sector_size * SELFTEST_DISK_RUN <= PMM_PAGE_SIZE &&
+		  d->sectors > SELFTEST_DISK_RUN;
+
+	ok = ok && block_read(d, 0, buf, 1) == 0;
+	for (usize i = 0; ok && sig[i]; i++)
+		ok = buf[i] == (u8)sig[i];
+
+	u64 first = ok ? d->sectors - SELFTEST_DISK_RUN : 0;
+	usize run_bytes = ok ? d->sector_size * SELFTEST_DISK_RUN : 0;
+
+	for (usize i = 0; i < run_bytes; i++)
+		buf[i] = disk_pattern(first + i / d->sector_size, i % d->sector_size);
+	ok = ok && block_write(d, first, buf, SELFTEST_DISK_RUN) == 0;
+	for (usize i = 0; i < run_bytes; i++)
+		buf[i] = 0;
+	ok = ok && block_read(d, first, buf, SELFTEST_DISK_RUN) == 0;
+	for (usize i = 0; ok && i < run_bytes; i++)
+		ok = buf[i] == disk_pattern(first + i / d->sector_size, i % d->sector_size);
+
+	/* Past the end, overlapping the end, and empty: all refused. */
+	ok = ok && block_read(d, d->sectors, buf, 1) != 0 &&
+	     block_write(d, d->sectors - 1, buf, 2) != 0 && block_read(d, 0, buf, 0) != 0;
+	/* The disk still works after the refusals. */
+	ok = ok && block_read(d, 0, buf, 1) == 0 && buf[0] == (u8)sig[0];
+
+	if (ok)
+		kprintf("Self-test: disk OK (%s: signature read, %u sectors written and read "
+			"back, bad ranges refused)\n",
+			d->name, SELFTEST_DISK_RUN);
+	else
+		kprintf("Self-test: disk FAILED (disks=%d)\n", block_count());
+	if (buf)
+		pmm_free_page((uptr)buf);
 }
 #endif
 
@@ -497,6 +554,9 @@ void selftest_run(void)
 #endif
 #if defined(KERNEL_TEST_USER)
 	selftest_user();
+#endif
+#if defined(KERNEL_TEST_DISK)
+	selftest_disk();
 #endif
 #if defined(KERNEL_TEST_FAULT)
 	/* Must end in the exception handler's report, never return here. */

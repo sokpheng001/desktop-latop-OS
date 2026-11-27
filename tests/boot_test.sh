@@ -35,6 +35,9 @@
 #          a program that gave up the console permission is refused printing;
 #          a server answers two clients by message and a send to a program that
 #          ends without receiving fails
+#   disk   self-test kernel (make KERNEL_TEST=disk, virt only): the test disk's
+#          signature must be read, sectors written at its end read back the same,
+#          and out-of-range requests refused
 #   pmm    self-test kernel (make KERNEL_TEST=pmm): every free page must be handed out
 #          once, written, and returned; double and misaligned frees are refused
 
@@ -42,7 +45,7 @@ set -u
 
 QEMU=${QEMU:-qemu-system-aarch64}
 BOOT_TIMEOUT=${BOOT_TIMEOUT:-10}
-RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-abort rpi4-abort virt-irq rpi4-irq virt-timer rpi4-timer virt-pmm rpi4-pmm virt-rodata rpi4-rodata virt-nx rpi4-nx virt-null rpi4-null virt-heap rpi4-heap virt-thread rpi4-thread virt-sched rpi4-sched virt-user rpi4-user"}
+RUNS=${RUNS:-"virt virt-el2 rpi4 virt-fault rpi4-fault virt-abort rpi4-abort virt-irq rpi4-irq virt-timer rpi4-timer virt-pmm rpi4-pmm virt-rodata rpi4-rodata virt-nx rpi4-nx virt-null rpi4-null virt-heap rpi4-heap virt-thread rpi4-thread virt-sched rpi4-sched virt-user rpi4-user virt-disk"}
 LOG_DIR=build/test
 MAKE=${MAKE:-make}
 
@@ -175,6 +178,11 @@ for run in $RUNS; do
             "[user] client got every reply" \
             "[user] send to an ended program failed" \
             "Self-test: user mode OK")
+        ;;
+    disk)
+        make_args="$make_args KERNEL_TEST=disk"
+        build_dir="build/$board-test-disk"
+        expect=$(printf '%s\n' "$expect" "Self-test: disk OK")
         ;;
     heap)
         make_args="$make_args KERNEL_TEST=heap"

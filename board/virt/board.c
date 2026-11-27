@@ -6,6 +6,7 @@
  * HAL implementation for the QEMU virt board.
  */
 
+#include "block.h"
 #include "board.h"
 #include "compiler.h"
 #include "drivers/arm_gtimer.h"
@@ -54,9 +55,28 @@ int hal_mmio_ranges(const struct hal_mmio_range **ranges)
 	return (int)ARRAY_SIZE(mmio_ranges);
 }
 
-/* The disk, if QEMU was given one; used by the block layer later in Phase 5. */
+/* The disk, if QEMU was given one, registered with the block layer as "vda". */
 static struct virtio_blk disk;
 static bool have_disk;
+
+static int disk_read(void *ctx, u64 sector, void *buf, u32 count)
+{
+	return virtio_blk_rw(ctx, sector, buf, count, false);
+}
+
+static int disk_write(void *ctx, u64 sector, const void *buf, u32 count)
+{
+	/* The device only reads buf for a write. */
+	return virtio_blk_rw(ctx, sector, (void *)(uptr)buf, count, true);
+}
+
+static struct block_dev disk_dev = {
+    .name = "vda",
+    .sector_size = VIRTIO_BLK_SECTOR_SIZE,
+    .ctx = &disk,
+    .read = disk_read,
+    .write = disk_write,
+};
 
 /* GIC interrupt number for a device's Device Tree interrupt specifier; 0 if none. */
 static u32 dt_irq(const struct fdt_device *d)
@@ -106,6 +126,9 @@ void hal_devices_init(uptr dtb)
 		if (id == (int)VIRTIO_ID_BLOCK && !have_disk) {
 			disk = blk;
 			have_disk = true;
+			disk_dev.sectors = disk.sectors;
+			disk_dev.read_only = disk.read_only;
+			block_register(&disk_dev);
 			kprintf(
 			    "Disk:   virtio block device at %p, irq %u, %lu sectors (%lu KiB)%s\n",
 			    (void *)disk.base, disk.irq, (unsigned long)disk.sectors,
